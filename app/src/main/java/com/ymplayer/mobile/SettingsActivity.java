@@ -172,6 +172,13 @@ public class SettingsActivity extends Activity {
                 v.setText(liveLabel());
             }
         });
+        row("Picture in Picture", PlayerActivity.pipEnabled(this) ? "On — keeps playing in a small window when you leave" : "Off", new Action() {
+            public void run(TextView v) {
+                boolean on = !PlayerActivity.pipEnabled(SettingsActivity.this);
+                prefs.raw().edit().putBoolean("pip", on).apply();
+                v.setText(on ? "On — keeps playing in a small window when you leave" : "Off");
+            }
+        });
         row("Fix Frozen Video Automatically", prefs.autoRecover() ? "On" : "Off", new Action() {
             public void run(TextView v) {
                 prefs.setAutoRecover(!prefs.autoRecover());

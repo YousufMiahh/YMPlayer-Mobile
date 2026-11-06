@@ -46,6 +46,8 @@
             android:name=".PlayerActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation"
             android:screenOrientation="sensorLandscape"
+            android:supportsPictureInPicture="true"
+            android:resizeableActivity="true"
             android:theme="@style/PlayerTheme" />
     </application>
 </manifest>

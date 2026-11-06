@@ -189,6 +189,7 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         root.addView(statusPill, sp);
 
         setContentView(root);
+        registerPipReceiver();
     }
 
     private TextView bubble() {
@@ -239,7 +240,7 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         top.setGravity(Gravity.CENTER_VERTICAL);
         top.setPadding(Ui.dp(this, 12), Ui.dp(this, 14), side, 0);
         Icon back = icon(Icon.Kind.BACK, 44, 10);
-        back.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { finish(); } });
+        back.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { onBackPressed(); } });
         top.addView(back);
         LinearLayout titles = new LinearLayout(this);
         titles.setOrientation(LinearLayout.VERTICAL);
@@ -430,6 +431,7 @@ public class PlayerActivity extends Activity implements Engine.Listener {
 
     private void showControls(boolean show) {
         Async.MAIN.removeCallbacks(hideControls);
+        if (show && inPip) return;
         if (show) {
             updateProgress();
             if (controls.getVisibility() != View.VISIBLE) {
@@ -876,6 +878,120 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         trackList.addView(r, lp);
     }
 
+    // ------------------------------------------------------------ picture in picture
+
+    private static final String PIP_ACTION = "com.ymplayer.mobile.PIP";
+    private static final int PIP_BACK = 1, PIP_TOGGLE = 2, PIP_FWD = 3;
+    private boolean inPip;
+    private android.content.BroadcastReceiver pipReceiver;
+
+    static boolean pipEnabled(android.content.Context c) {
+        return new Prefs(c).raw().getBoolean("pip", true);
+    }
+
+    private boolean canPip() {
+        return Build.VERSION.SDK_INT >= 26 && pipEnabled(this) && engine != null && !casting
+                && getPackageManager().hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE);
+    }
+
+    /** The buttons in the small window: back 5 s / play-pause / forward 10 s (or channel down / up on Live TV). */
+    @android.annotation.TargetApi(26)
+    private android.app.PictureInPictureParams pipParams() {
+        android.app.PictureInPictureParams.Builder b = new android.app.PictureInPictureParams.Builder()
+                .setAspectRatio(new android.util.Rational(16, 9));
+        java.util.List<android.app.RemoteAction> acts = new java.util.ArrayList<>();
+        boolean live = isLive();
+        if (!live || queue.size() > 1) acts.add(pipAction(PIP_BACK, live ? Icon.Kind.PREV : Icon.Kind.BACK10, live ? "Previous channel" : "Back 5 seconds"));
+        boolean playing = curPlaying();
+        acts.add(pipAction(PIP_TOGGLE, playing ? Icon.Kind.PAUSE : Icon.Kind.PLAY, playing ? "Pause" : "Play"));
+        if (!live || queue.size() > 1) acts.add(pipAction(PIP_FWD, live ? Icon.Kind.NEXT : Icon.Kind.FWD10, live ? "Next channel" : "Forward 10 seconds"));
+        b.setActions(acts);
+        if (Build.VERSION.SDK_INT >= 31) {
+            // Swiping home goes straight into the small window (Android 12+)
+            try {
+                b.getClass().getMethod("setAutoEnterEnabled", boolean.class).invoke(b, canPip() && playing);
+            } catch (Exception ignored) {
+            }
+        }
+        return b.build();
+    }
+
+    @android.annotation.TargetApi(26)
+    private android.app.RemoteAction pipAction(int cmd, Icon.Kind kind, String title) {
+        int size = Ui.dp(this, 32);
+        Icon v = new Icon(this, kind, Color.WHITE);
+        v.measure(View.MeasureSpec.makeMeasureSpec(size, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(size, View.MeasureSpec.EXACTLY));
+        v.layout(0, 0, size, size);
+        android.graphics.Bitmap bm = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888);
+        v.draw(new android.graphics.Canvas(bm));
+        android.content.Intent i = new android.content.Intent(PIP_ACTION).setPackage(getPackageName()).putExtra("cmd", cmd);
+        android.app.PendingIntent pi = android.app.PendingIntent.getBroadcast(this, cmd, i,
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
+        return new android.app.RemoteAction(android.graphics.drawable.Icon.createWithBitmap(bm), title, title, pi);
+    }
+
+    private void registerPipReceiver() {
+        if (Build.VERSION.SDK_INT < 26) return;
+        pipReceiver = new android.content.BroadcastReceiver() {
+            public void onReceive(android.content.Context c, android.content.Intent i) {
+                switch (i.getIntExtra("cmd", 0)) {
+                    case PIP_BACK:
+                        if (isLive()) zap(-1);
+                        else seekBy(-BACK_MS, -1);
+                        break;
+                    case PIP_TOGGLE:
+                        togglePause();
+                        break;
+                    case PIP_FWD:
+                        if (isLive()) zap(1);
+                        else seekBy(FORWARD_MS, 1);
+                        break;
+                }
+                Async.MAIN.postDelayed(new Runnable() { public void run() { updatePip(); } }, 300);
+            }
+        };
+        android.content.IntentFilter f = new android.content.IntentFilter(PIP_ACTION);
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(pipReceiver, f, 4 /* RECEIVER_NOT_EXPORTED */);
+        else registerReceiver(pipReceiver, f);
+    }
+
+    /** Keep the small window's buttons (and Android 12's auto-enter) in step with playback. */
+    private void updatePip() {
+        if (Build.VERSION.SDK_INT < 26 || engine == null) return;
+        try {
+            if (inPip || Build.VERSION.SDK_INT >= 31) setPictureInPictureParams(pipParams());
+        } catch (Exception ignored) {
+        }
+    }
+
+    @Override
+    protected void onUserLeaveHint() {
+        super.onUserLeaveHint();
+        // Home button / swipe away while watching: keep playing in a small window
+        if (canPip() && curPlaying() && !panelOpen()) {
+            try {
+                enterPictureInPictureMode(pipParams());
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    @Override
+    public void onPictureInPictureModeChanged(boolean pip, android.content.res.Configuration cfg) {
+        super.onPictureInPictureModeChanged(pip, cfg);
+        inPip = pip;
+        if (pip) {
+            Async.MAIN.removeCallbacks(hideControls);
+            controls.setVisibility(View.GONE);
+            hidePanels();
+            statusPill.setVisibility(View.GONE);
+            seekBubbleL.setAlpha(0f);
+            seekBubbleR.setAlpha(0f);
+        } else {
+            immersive();
+        }
+    }
+
     // ------------------------------------------------------------ lifecycle
 
     @Override
@@ -898,13 +1014,21 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         Cast.listen(this, castChanges, false);
         savePosition(); // if casting, the TV just carries on
         releaseEngine();
+        boolean closedPip = inPip;
         super.onStop();
+        if (closedPip) finish(); // the small window was closed: stop for good
     }
 
     @Override
     protected void onDestroy() {
         Runnable[] all = {hideControls, endBurst, hideStatus, zapPlay, ticker, watchdog};
         for (Runnable r : all) Async.MAIN.removeCallbacks(r);
+        if (pipReceiver != null) {
+            try {
+                unregisterReceiver(pipReceiver);
+            } catch (Exception ignored) {
+            }
+        }
         super.onDestroy();
     }
 
@@ -971,6 +1095,8 @@ public class PlayerActivity extends Activity implements Engine.Listener {
 
     public void onPlayingChanged(boolean playing) {
         playPause.setKind(playing ? Icon.Kind.PAUSE : Icon.Kind.PLAY);
+        updatePip();
+        if (inPip) return;
         if (!playing && engine != null && engine.isReady() && !isLive()) {
             showControls(true);
             Async.MAIN.removeCallbacks(hideControls);
@@ -1189,6 +1315,7 @@ public class PlayerActivity extends Activity implements Engine.Listener {
     }
 
     private void status(String s) {
+        if (inPip) return;
         statusPill.setText(s);
         statusPill.setVisibility(View.VISIBLE);
         Async.MAIN.removeCallbacks(hideStatus);
@@ -1277,6 +1404,11 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         if (videoHost != null && panelOpen()) {
             hidePanels();
             return;
+        }
+        // After picture in picture the player is in a window of its own: Back returns to the app, not the home screen
+        if (isTaskRoot()) {
+            startActivity(new android.content.Intent(this, MainActivity.class)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK | android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
         }
         super.onBackPressed();
     }
