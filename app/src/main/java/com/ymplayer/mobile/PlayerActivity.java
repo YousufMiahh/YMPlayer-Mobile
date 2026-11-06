@@ -1077,15 +1077,21 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         lastRendered = -1;
         stallTicks = 0;
         try {
-            engine.load(api.playUrl(current(), liveFormat), startMs);
+            engine.load(streamUrl(), startMs);
         } catch (Throwable t) {
             App.writeCrash(this, t);
             if (!usingVlc || isLive()) throw t instanceof RuntimeException ? (RuntimeException) t : new RuntimeException(t);
             prefs.setVlcBroken(true);
             startEngine(false);
             status("VLC couldn't start — using the Android player");
-            engine.load(api.playUrl(current(), liveFormat), startMs);
+            engine.load(streamUrl(), startMs);
         }
+    }
+
+    /** Downloaded movies and episodes play from the phone; everything else streams. */
+    private String streamUrl() {
+        String local = isLive() ? null : Downloads.localUrl(this, current());
+        return local != null ? local : api.playUrl(current(), liveFormat);
     }
 
     private void savePosition() {

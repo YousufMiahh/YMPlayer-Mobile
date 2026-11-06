@@ -182,6 +182,15 @@ public class SettingsActivity extends Activity {
             public void run(TextView v) { editUserAgent(v); }
         });
 
+        section("Downloads");
+        row("Download over Wi-Fi only", Downloads.wifiOnly(this) ? "On" : "Off", new Action() {
+            public void run(TextView v) {
+                Downloads.setWifiOnly(SettingsActivity.this, !Downloads.wifiOnly(SettingsActivity.this));
+                v.setText(Downloads.wifiOnly(SettingsActivity.this) ? "On" : "Off");
+                Toast.makeText(SettingsActivity.this, "Applies to new downloads", Toast.LENGTH_SHORT).show();
+            }
+        });
+
         section("Library");
         row("Refresh Automatically", refreshLabel(prefs.refreshHours()), new Action() {
             public void run(TextView v) {

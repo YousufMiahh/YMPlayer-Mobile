@@ -131,6 +131,8 @@ public class MovieActivity extends Activity {
                 buildButtons();
             }
         }));
+        DownloadButton dl = new DownloadButton(this, api, movie, true);
+        actions.addView(dl, new LinearLayout.LayoutParams(Ui.dp(this, 84), ViewGroup.LayoutParams.WRAP_CONTENT));
         if (trailer != null) {
             actions.addView(DetailUi.action(this, Icon.Kind.TRAILER, "Trailer", Ui.TEXT, new View.OnClickListener() {
                 public void onClick(View v) { TrailerActivity.open(MovieActivity.this, trailer); }

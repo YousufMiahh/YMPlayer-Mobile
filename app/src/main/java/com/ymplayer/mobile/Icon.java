@@ -11,7 +11,7 @@ import android.view.View;
 public class Icon extends View {
     public enum Kind {
         HOME, LIVE, MOVIES, SERIES, SEARCH, SETTINGS, BACK, DOWN, HEART, HEART_FILLED, PLAY, PAUSE,
-        BACK10, FWD10, SUBS, LIST, CLOSE, PLUS, CHECK, INFO, NEXT, PREV, FIT, TRAILER, RESTART, CAST, CAST_ON
+        BACK10, FWD10, SUBS, LIST, CLOSE, PLUS, CHECK, INFO, NEXT, PREV, FIT, TRAILER, RESTART, CAST, CAST_ON, DOWNLOAD
     }
 
     private Kind kind;
@@ -206,6 +206,12 @@ public class Icon extends View {
                 c.drawArc(r, -90, 90, false, stroke);
                 r.set(2.5f - 9.5f, 19.5f - 9.5f, 2.5f + 9.5f, 19.5f + 9.5f);
                 c.drawArc(r, -90, 90, false, stroke);
+                break;
+            case DOWNLOAD:
+                c.drawLine(12, 3.5f, 12, 15, stroke);
+                path.moveTo(7, 10.5f); path.lineTo(12, 15.5f); path.lineTo(17, 10.5f);
+                path.moveTo(4.5f, 20); path.lineTo(19.5f, 20);
+                c.drawPath(path, stroke);
                 break;
             case RESTART:
                 r.set(4, 4, 20, 20);

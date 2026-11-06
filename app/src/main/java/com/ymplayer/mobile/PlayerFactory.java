@@ -5,6 +5,7 @@ import android.content.Context;
 
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.MimeTypes;
+import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.datasource.DefaultHttpDataSource;
 import androidx.media3.exoplayer.DefaultRenderersFactory;
 import androidx.media3.exoplayer.ExoPlayer;
@@ -26,7 +27,7 @@ public final class PlayerFactory {
         DefaultExtractorsFactory extractors = new DefaultExtractorsFactory()
                 .setTsExtractorFlags(DefaultTsPayloadReaderFactory.FLAG_ALLOW_NON_IDR_KEYFRAMES
                         | DefaultTsPayloadReaderFactory.FLAG_DETECT_ACCESS_UNITS);
-        DefaultMediaSourceFactory sources = new DefaultMediaSourceFactory(http, extractors);
+        DefaultMediaSourceFactory sources = new DefaultMediaSourceFactory(new DefaultDataSource.Factory(c, http), extractors); // http(s) streams and downloaded files
         DefaultRenderersFactory renderers = new DefaultRenderersFactory(c).setEnableDecoderFallback(true);
         return new ExoPlayer.Builder(c, renderers).setMediaSourceFactory(sources).build();
     }

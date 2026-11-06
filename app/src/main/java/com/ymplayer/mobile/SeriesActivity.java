@@ -387,6 +387,7 @@ public class SeriesActivity extends Activity {
                 texts.addView(d);
             }
             line.addView(texts, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+            line.addView(new DownloadButton(this, api, ep, false), new LinearLayout.LayoutParams(Ui.dp(this, 46), ViewGroup.LayoutParams.WRAP_CONTENT));
             row.addView(line);
             if (ep.plot != null && !ep.plot.isEmpty()) {
                 TextView pl = Ui.lines(Ui.text(this, ep.plot, 12.5f, Ui.TEXT2), 3);

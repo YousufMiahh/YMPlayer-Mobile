@@ -16,19 +16,19 @@ import android.widget.TextView;
  * Switching tabs glides the highlight across and slides the new page in from that side.
  */
 public class MainActivity extends Activity {
-    static final int HOME = 0, LIVE = 1, MOVIES = 2, SERIES = 3, SEARCH = 4;
-    private static final String[] LABELS = {"Home", "Live TV", "Movies", "Series", "Search"};
-    private static final Icon.Kind[] ICONS = {Icon.Kind.HOME, Icon.Kind.LIVE, Icon.Kind.MOVIES, Icon.Kind.SERIES, Icon.Kind.SEARCH};
+    static final int HOME = 0, LIVE = 1, MOVIES = 2, SERIES = 3, DOWNLOADS = 4, SEARCH = 5;
+    private static final String[] LABELS = {"Home", "Live TV", "Movies", "Series", "Downloads", "Search"};
+    private static final Icon.Kind[] ICONS = {Icon.Kind.HOME, Icon.Kind.LIVE, Icon.Kind.MOVIES, Icon.Kind.SERIES, Icon.Kind.DOWNLOAD, Icon.Kind.SEARCH};
     private static final DecelerateInterpolator EASE = new DecelerateInterpolator(2f);
 
     Prefs prefs;
     XtreamApi api;
     private FrameLayout pages;
-    private final Page[] page = new Page[5];
+    private final Page[] page = new Page[6];
     private int current = -1;
     private LinearLayout nav;
-    private final Icon[] navIcons = new Icon[5];
-    private final TextView[] navLabels = new TextView[5];
+    private final Icon[] navIcons = new Icon[6];
+    private final TextView[] navLabels = new TextView[6];
     private View navPill;
     private ValueAnimator pillAnim;
     private boolean started;
@@ -61,6 +61,7 @@ public class MainActivity extends Activity {
         page[LIVE] = new BrowsePage(this, Item.LIVE);
         page[MOVIES] = new BrowsePage(this, Item.MOVIE);
         page[SERIES] = new BrowsePage(this, Item.SERIES);
+        page[DOWNLOADS] = new DownloadsPage(this);
         page[SEARCH] = new SearchPage(this);
         int start = b != null ? b.getInt("tab", HOME) : HOME;
         select(start, false);
@@ -83,7 +84,7 @@ public class MainActivity extends Activity {
         nav = new LinearLayout(this);
         nav.setOrientation(LinearLayout.HORIZONTAL);
         bar.addView(nav, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < LABELS.length; i++) {
             final int idx = i;
             LinearLayout t = new LinearLayout(this);
             t.setOrientation(LinearLayout.VERTICAL);
@@ -135,7 +136,7 @@ public class MainActivity extends Activity {
         } else if (from >= 0) {
             page[from].view().setVisibility(View.GONE);
         }
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < LABELS.length; i++) {
             int col = i == idx ? Ui.TEXT : Ui.TEXT3;
             navIcons[i].setColor(col);
             navLabels[i].setTextColor(col);
