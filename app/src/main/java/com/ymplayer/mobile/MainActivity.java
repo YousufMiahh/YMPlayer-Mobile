@@ -91,9 +91,12 @@ public class MainActivity extends Activity {
             t.setPadding(0, Ui.dp(this, 10), 0, 0);
             navIcons[i] = new Icon(this, ICONS[i], Ui.TEXT3);
             t.addView(navIcons[i], new LinearLayout.LayoutParams(Ui.dp(this, 24), Ui.dp(this, 24)));
-            navLabels[i] = Ui.oneLine(Ui.medium(this, LABELS[i], 10.5f, Ui.TEXT3));
+            // Full-width and centred (a single-line TextView left at its natural width drifted off centre)
+            navLabels[i] = Ui.medium(this, LABELS[i], 10.5f, Ui.TEXT3);
+            navLabels[i].setMaxLines(1);
+            navLabels[i].setGravity(Gravity.CENTER_HORIZONTAL);
             navLabels[i].setPadding(0, Ui.dp(this, 7), 0, 0);
-            t.addView(navLabels[i]);
+            t.addView(navLabels[i], new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             t.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) { select(idx, true); }
             });

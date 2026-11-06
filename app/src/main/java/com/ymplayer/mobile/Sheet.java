@@ -31,6 +31,14 @@ public final class Sheet {
 
         public Option(String label, boolean checked, Runnable action) { this(label, checked, action, false); }
 
+        boolean inert;
+
+        /** A row that's just information (tapping it does nothing). */
+        public Option inert() {
+            inert = true;
+            return this;
+        }
+
         public Option heart(boolean on, Runnable toggle) {
             hasHeart = true;
             hearted = on;
@@ -76,6 +84,10 @@ public final class Sheet {
     }
 
     private final List<Option> visible = new ArrayList<>();
+    private BaseAdapter adapter;
+    private ListView listView;
+    private int rowH, maxH;
+    private boolean fixedHeight;
 
     private Sheet(final Activity a, String title, String subtitle, final List<Option> options, int scrollTo, String searchHint) {
         this.a = a;
@@ -120,7 +132,7 @@ public final class Sheet {
         list.setDivider(null);
         list.setSelector(new android.graphics.drawable.ColorDrawable(0));
         list.setVerticalScrollBarEnabled(false);
-        final BaseAdapter adapter = new BaseAdapter() {
+        adapter = new BaseAdapter() {
             public int getCount() { return visible.size(); }
             public Object getItem(int i) { return visible.get(i); }
             public long getItemId(int i) { return i; }
@@ -132,7 +144,7 @@ public final class Sheet {
                 row.setMinimumHeight(Ui.dp(a, 50));
                 Ui.ripple(row, null, 0);
                 row.setClickable(false);
-                TextView l = Ui.oneLine(Ui.medium(a, o.label, 16, o.destructive ? Ui.RED : Ui.TEXT));
+                TextView l = Ui.oneLine(Ui.medium(a, o.label, 16, o.destructive ? Ui.RED : o.inert ? Ui.TEXT2 : Ui.TEXT));
                 if (o.checked) l.setTypeface(Ui.bold());
                 row.addView(l, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
                 if (o.checked) {
@@ -166,14 +178,17 @@ public final class Sheet {
         list.setAdapter(adapter);
         list.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
             public void onItemClick(android.widget.AdapterView<?> p, View v, int i, long id) {
+                if (visible.get(i).inert) return;
                 final Runnable act = visible.get(i).action;
                 close();
                 if (act != null) act.run();
             }
         });
-        int rowH = Ui.dp(a, 50);
+        listView = list;
+        rowH = Ui.dp(a, 50);
         int screenH = a.getResources().getDisplayMetrics().heightPixels;
-        int maxH = (int) (screenH * (searchHint != null ? 0.55f : 0.62f));
+        maxH = (int) (screenH * (searchHint != null ? 0.55f : 0.62f));
+        fixedHeight = searchHint != null;
         int h = searchHint != null ? maxH : Math.min(maxH, rowH * Math.max(1, options.size()));
 
         if (searchHint != null) {
@@ -269,6 +284,20 @@ public final class Sheet {
             }
         });
     }
+
+    /** Replace the rows while the sheet is open (e.g. Cast devices appearing). */
+    public void setOptions(List<Option> options) {
+        visible.clear();
+        visible.addAll(options);
+        adapter.notifyDataSetChanged();
+        if (!fixedHeight) {
+            ViewGroup.LayoutParams lp = listView.getLayoutParams();
+            lp.height = Math.min(maxH, rowH * Math.max(1, options.size()));
+            listView.setLayoutParams(lp);
+        }
+    }
+
+    public boolean isOpen() { return !closing; }
 
     public void close() {
         if (closing) return;

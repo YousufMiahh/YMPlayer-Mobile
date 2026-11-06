@@ -69,6 +69,20 @@ public class PlayerActivity extends Activity implements Engine.Listener {
     private LinearLayout errorBox;
     private TextView errorText, statusPill;
 
+    // Casting: the video is playing on a TV, this screen is the remote control
+    private boolean casting;
+    private long lastCastPos;
+    private Icon castBtn;
+    private LinearLayout castInfo;
+    private TextView castText;
+    private final Cast.Changes castChanges = new Cast.Changes() {
+        void changed(boolean on) {
+            paintCast();
+            if (on && !casting) startCasting();
+            else if (!on && casting) stopCasting();
+        }
+    };
+
     // State
     private String liveFormat;
     private int retries;
@@ -138,6 +152,18 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         spinner.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(Ui.W2));
         spinner.setVisibility(View.GONE);
         root.addView(spinner, new FrameLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48), Gravity.CENTER));
+
+        castInfo = new LinearLayout(this);
+        castInfo.setOrientation(LinearLayout.VERTICAL);
+        castInfo.setGravity(Gravity.CENTER_HORIZONTAL);
+        castInfo.setVisibility(View.GONE);
+        castInfo.addView(new Icon(this, Icon.Kind.CAST_ON, Ui.W2), new LinearLayout.LayoutParams(Ui.dp(this, 56), Ui.dp(this, 56)));
+        castText = Ui.medium(this, "", 15, Ui.W2);
+        castText.setPadding(0, Ui.dp(this, 12), 0, 0);
+        castInfo.addView(castText);
+        FrameLayout.LayoutParams cil = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER);
+        cil.topMargin = -Ui.dp(this, 120); // sits above the play controls
+        root.addView(castInfo, cil);
 
         seekBubbleL = bubble();
         seekBubbleR = bubble();
@@ -224,6 +250,11 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         titles.addView(title);
         titles.addView(subtitle);
         top.addView(titles, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        castBtn = icon(Icon.Kind.CAST, 44, 10);
+        castBtn.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { Cast.pick(PlayerActivity.this); }
+        });
+        top.addView(castBtn);
         controls.addView(top, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP));
 
         // Centre: back 5 s / play-pause / forward 10 s (channel down / up on Live TV)
@@ -416,7 +447,85 @@ public class PlayerActivity extends Activity implements Engine.Listener {
 
     private void scheduleHide() {
         Async.MAIN.removeCallbacks(hideControls);
-        if (engine != null && engine.isPlaying() && !dragging) Async.MAIN.postDelayed(hideControls, 4000);
+        if (!casting && curPlaying() && !dragging) Async.MAIN.postDelayed(hideControls, 4000); // casting: controls stay up
+    }
+
+    // ------------------------------------------------------------ one set of controls for the phone or the TV
+
+    private com.google.android.gms.cast.framework.media.RemoteMediaClient rm() { return casting ? Cast.remote(this) : null; }
+
+    private boolean hasPlayer() { return casting || engine != null; }
+
+    private long curPos() {
+        if (casting) {
+            com.google.android.gms.cast.framework.media.RemoteMediaClient r = rm();
+            if (r != null) lastCastPos = r.getApproximateStreamPosition();
+            return lastCastPos;
+        }
+        return engine == null ? 0 : engine.position();
+    }
+
+    private long curDur() {
+        if (casting) {
+            com.google.android.gms.cast.framework.media.RemoteMediaClient r = rm();
+            return r == null ? 0 : Math.max(0, r.getStreamDuration());
+        }
+        return engine == null ? 0 : engine.duration();
+    }
+
+    private long curBuffered() { return casting || engine == null ? 0 : engine.buffered(); }
+
+    private boolean curPlaying() {
+        if (casting) {
+            com.google.android.gms.cast.framework.media.RemoteMediaClient r = rm();
+            return r != null && r.isPlaying();
+        }
+        return engine != null && engine.isPlaying();
+    }
+
+    private void curSeek(long ms) {
+        if (casting) {
+            com.google.android.gms.cast.framework.media.RemoteMediaClient r = rm();
+            if (r != null) r.seek(new com.google.android.gms.cast.MediaSeekOptions.Builder().setPosition(ms).build());
+            lastCastPos = ms;
+        } else if (engine != null) {
+            engine.seekTo(ms);
+        }
+    }
+
+    private void paintCast() {
+        if (castBtn == null) return;
+        boolean on = Cast.connected(this);
+        castBtn.setKind(on ? Icon.Kind.CAST_ON : Icon.Kind.CAST);
+        castBtn.setColor(on ? Ui.ACCENT : Ui.W1);
+    }
+
+    /** Casting just connected: hand the video over to the TV, carrying on from the same point. */
+    private void startCasting() {
+        long pos = isLive() || engine == null ? prefs.position(current()) : engine.position();
+        savePosition();
+        releaseEngine();
+        casting = true;
+        lastCastPos = pos;
+        showCastInfo();
+        Cast.load(this, api, current(), isLive() ? 0 : pos);
+        showControls(true);
+    }
+
+    /** Casting ended: carry on here on the phone. */
+    private void stopCasting() {
+        long pos = lastCastPos;
+        casting = false;
+        castInfo.setVisibility(View.GONE);
+        if (!isLive() && pos > 10000) prefs.setPosition(current(), pos);
+        play(true);
+    }
+
+    private void showCastInfo() {
+        castText.setText("Playing on " + Cast.deviceName(this));
+        castInfo.setVisibility(View.VISIBLE);
+        spinner.setVisibility(View.GONE);
+        errorBox.setVisibility(View.GONE);
     }
 
     private boolean controlsShown() { return controls.getVisibility() == View.VISIBLE && controls.getAlpha() > 0.5f; }
@@ -437,7 +546,7 @@ public class PlayerActivity extends Activity implements Engine.Listener {
 
         @Override
         public boolean onDoubleTap(MotionEvent e) {
-            if (engine == null || panelOpen()) return false;
+            if (!hasPlayer() || panelOpen()) return false;
             float w = root.getWidth();
             if (isLive()) {
                 togglePause();
@@ -462,8 +571,8 @@ public class PlayerActivity extends Activity implements Engine.Listener {
     }
 
     private boolean onSeekTouch(MotionEvent e) {
-        if (engine == null || isLive()) return false;
-        long d = engine.duration();
+        if (!hasPlayer() || isLive()) return false;
+        long d = curDur();
         if (d <= 0) return false;
         float f = seek.fractionAt(e.getX());
         switch (e.getActionMasked()) {
@@ -476,7 +585,7 @@ public class PlayerActivity extends Activity implements Engine.Listener {
                 // fall through
             case MotionEvent.ACTION_MOVE:
                 seekTarget = (long) (f * d);
-                seek.set(f, engine.buffered() / (float) d);
+                seek.set(f, curBuffered() / (float) d);
                 timeLeft.setText(SeriesActivity.fmt(seekTarget));
                 timeRight.setText("−" + SeriesActivity.fmt(Math.max(0, d - seekTarget)));
                 dragTime.setText(SeriesActivity.fmt(seekTarget));
@@ -487,7 +596,7 @@ public class PlayerActivity extends Activity implements Engine.Listener {
                 seek.setDragging(false);
                 dragTime.setVisibility(View.GONE);
                 long target = Math.min((long) (f * d), d - 1000);
-                engine.seekTo(Math.max(0, target));
+                curSeek(Math.max(0, target));
                 seekTarget = -1;
                 scheduleHide();
                 return true;
@@ -773,7 +882,8 @@ public class PlayerActivity extends Activity implements Engine.Listener {
     protected void onStart() {
         super.onStart();
         if (videoHost == null) return;
-        startEngine(wantsVlc(current()));
+        Cast.listen(this, castChanges, true);
+        paintCast();
         play(true);
         firstStart = false;
         Async.MAIN.post(ticker);
@@ -785,7 +895,8 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         Async.MAIN.removeCallbacks(ticker);
         Async.MAIN.removeCallbacks(watchdog);
         Async.MAIN.removeCallbacks(zapPlay);
-        savePosition();
+        Cast.listen(this, castChanges, false);
+        savePosition(); // if casting, the TV just carries on
         releaseEngine();
         super.onStop();
     }
@@ -919,8 +1030,6 @@ public class PlayerActivity extends Activity implements Engine.Listener {
     private void play(boolean resume) {
         if (videoHost == null) return;
         Item it = current();
-        boolean vlc = wantsVlc(it);
-        if (engine == null || vlc != usingVlc) startEngine(vlc);
         long start = 0;
         if (!isLive() && resume) {
             long pos = prefs.position(it);
@@ -929,7 +1038,19 @@ public class PlayerActivity extends Activity implements Engine.Listener {
                 if (firstStart) Toast.makeText(this, "Resuming from " + SeriesActivity.fmt(pos), Toast.LENGTH_SHORT).show();
             }
         }
-        load(start);
+        if (Cast.connected(this)) { // already casting: send it straight to the TV
+            releaseEngine();
+            casting = true;
+            lastCastPos = start;
+            showCastInfo();
+            Cast.load(this, api, it, start);
+        } else {
+            casting = false;
+            castInfo.setVisibility(View.GONE);
+            boolean vlc = wantsVlc(it);
+            if (engine == null || vlc != usingVlc) startEngine(vlc);
+            load(start);
+        }
         prefs.addHistory(it);
         boolean live = isLive();
         vodBottom.setVisibility(live ? View.GONE : View.VISIBLE);
@@ -968,8 +1089,8 @@ public class PlayerActivity extends Activity implements Engine.Listener {
     }
 
     private void savePosition() {
-        if (engine == null || queue == null || isLive()) return;
-        long d = engine.duration(), p = engine.position();
+        if (!hasPlayer() || queue == null || isLive()) return;
+        long d = curDur(), p = curPos();
         if (d > 0) prefs.setDuration(current(), d);
         if (d > 0 && p > d - 60000) prefs.setPosition(current(), 0);
         else if (p > 10000) prefs.setPosition(current(), p);
@@ -1013,16 +1134,17 @@ public class PlayerActivity extends Activity implements Engine.Listener {
     }
 
     private void updateProgress() {
-        if (engine == null || isLive() || dragging || controls.getVisibility() != View.VISIBLE) return;
-        long d = engine.duration();
-        long p = seekTarget >= 0 ? seekTarget : engine.position();
+        if (casting) playPause.setKind(curPlaying() ? Icon.Kind.PAUSE : Icon.Kind.PLAY);
+        if (!hasPlayer() || isLive() || dragging || controls.getVisibility() != View.VISIBLE) return;
+        long d = curDur();
+        long p = seekTarget >= 0 ? seekTarget : curPos();
         if (d <= 0) {
             seek.set(0, 0);
             timeLeft.setText(SeriesActivity.fmt(p));
             timeRight.setText("");
             return;
         }
-        seek.set(p / (float) d, engine.buffered() / (float) d);
+        seek.set(p / (float) d, curBuffered() / (float) d);
         timeLeft.setText(SeriesActivity.fmt(p));
         timeRight.setText("−" + SeriesActivity.fmt(Math.max(0, d - p)));
     }
@@ -1068,24 +1190,30 @@ public class PlayerActivity extends Activity implements Engine.Listener {
     }
 
     private void togglePause() {
-        if (engine == null) return;
-        if (engine.isPlaying()) engine.pause();
-        else engine.play();
+        if (casting) {
+            com.google.android.gms.cast.framework.media.RemoteMediaClient r = rm();
+            if (r != null) r.togglePlayback();
+            playPause.setKind(curPlaying() ? Icon.Kind.PLAY : Icon.Kind.PAUSE);
+        } else {
+            if (engine == null) return;
+            if (engine.isPlaying()) engine.pause();
+            else engine.play();
+        }
         pulse(playPause);
     }
 
     /** Double-tap skipping: repeated taps add up ("+30 sec"), shown on that side of the screen. */
     private void seekBy(long delta, int side) {
-        if (engine == null) return;
-        long d = engine.duration();
-        long base = seekTarget >= 0 ? seekTarget : engine.position();
+        if (!hasPlayer()) return;
+        long d = curDur();
+        long base = seekTarget >= 0 ? seekTarget : curPos();
         long target = Math.max(0, base + delta);
         if (d > 0) target = Math.min(target, d - 1000);
         seekTarget = target;
         if (side != burstSide) burst = 0;
         burstSide = side;
         burst += delta;
-        engine.seekTo(target);
+        curSeek(target);
         long s = Math.abs(burst) / 1000;
         TextView b = side < 0 ? seekBubbleL : seekBubbleR;
         (side < 0 ? seekBubbleR : seekBubbleL).setAlpha(0f);

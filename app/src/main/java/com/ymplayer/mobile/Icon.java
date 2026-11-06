@@ -11,7 +11,7 @@ import android.view.View;
 public class Icon extends View {
     public enum Kind {
         HOME, LIVE, MOVIES, SERIES, SEARCH, SETTINGS, BACK, DOWN, HEART, HEART_FILLED, PLAY, PAUSE,
-        BACK10, FWD10, SUBS, LIST, CLOSE, PLUS, CHECK, INFO, NEXT, PREV, FIT, TRAILER, RESTART
+        BACK10, FWD10, SUBS, LIST, CLOSE, PLUS, CHECK, INFO, NEXT, PREV, FIT, TRAILER, RESTART, CAST, CAST_ON
     }
 
     private Kind kind;
@@ -184,6 +184,28 @@ public class Icon extends View {
                 r.set(2.5f, 5, 21.5f, 19); c.drawRoundRect(r, 4, 4, stroke);
                 path.moveTo(10, 9); path.lineTo(15, 12); path.lineTo(10, 15); path.close();
                 c.drawPath(path, fill);
+                break;
+            case CAST:
+            case CAST_ON:
+                // Screen outline, open at the bottom-left where the waves are
+                path.moveTo(2.5f, 8);
+                path.lineTo(2.5f, 6.5f);
+                path.quadTo(2.5f, 4.5f, 4.5f, 4.5f);
+                path.lineTo(19.5f, 4.5f);
+                path.quadTo(21.5f, 4.5f, 21.5f, 6.5f);
+                path.lineTo(21.5f, 17.5f);
+                path.quadTo(21.5f, 19.5f, 19.5f, 19.5f);
+                path.lineTo(14, 19.5f);
+                c.drawPath(path, stroke);
+                if (kind == Kind.CAST_ON) {
+                    r.set(6.5f, 8, 18, 16);
+                    c.drawRoundRect(r, 1, 1, fill);
+                }
+                c.drawCircle(3.2f, 18.8f, 1.3f, fill);
+                r.set(2.5f - 5.5f, 19.5f - 5.5f, 2.5f + 5.5f, 19.5f + 5.5f);
+                c.drawArc(r, -90, 90, false, stroke);
+                r.set(2.5f - 9.5f, 19.5f - 9.5f, 2.5f + 9.5f, 19.5f + 9.5f);
+                c.drawArc(r, -90, 90, false, stroke);
                 break;
             case RESTART:
                 r.set(4, 4, 20, 20);

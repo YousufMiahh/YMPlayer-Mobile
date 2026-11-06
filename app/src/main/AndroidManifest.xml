@@ -17,6 +17,10 @@
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true">
 
+        <meta-data
+            android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
+            android:value="com.ymplayer.mobile.Cast$Options" />
+
         <activity
             android:name=".SplashActivity"
             android:exported="true"

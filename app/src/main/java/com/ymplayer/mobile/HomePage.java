@@ -22,6 +22,17 @@ import java.util.List;
  */
 class HomePage extends Page {
     private ScrollView scroll;
+    private Icon castBtn;
+    private final Cast.Changes castChanges = new Cast.Changes() {
+        void changed(boolean on) { paintCast(); }
+    };
+
+    private void paintCast() {
+        if (castBtn == null) return;
+        boolean on = Cast.connected(a);
+        castBtn.setKind(on ? Icon.Kind.CAST_ON : Icon.Kind.CAST);
+        castBtn.setColor(on ? Ui.ACCENT : Ui.TEXT);
+    }
     private LinearLayout localRows, remoteRows, hero;
     private TextView empty;
     private List<Item> newMovies, newSeries, topMovies, topSeries;
@@ -60,6 +71,10 @@ class HomePage extends Page {
         TextView name = Ui.title(a, "YM Player", 20);
         name.setPadding(Ui.dp(a, 10), 0, 0, 0);
         top.addView(name, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        castBtn = (Icon) iconButton(Icon.Kind.CAST, new View.OnClickListener() {
+            public void onClick(View v) { Cast.pick(a); }
+        });
+        top.addView(castBtn);
         top.addView(iconButton(Icon.Kind.SETTINGS, new View.OnClickListener() {
             public void onClick(View v) { a.startActivity(new Intent(a, SettingsActivity.class)); }
         }));
@@ -109,12 +124,17 @@ class HomePage extends Page {
 
     @Override
     void onStart() {
+        Cast.listen(a, castChanges, true);
+        paintCast();
         Async.MAIN.removeCallbacks(top10Tick);
         Async.MAIN.post(top10Tick); // check now (cheap if not due), then hourly while the app is open
     }
 
     @Override
-    void onStop() { Async.MAIN.removeCallbacks(top10Tick); }
+    void onStop() {
+        Async.MAIN.removeCallbacks(top10Tick);
+        Cast.listen(a, castChanges, false);
+    }
 
     @Override
     void onDestroy() {

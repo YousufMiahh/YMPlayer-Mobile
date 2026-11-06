@@ -61,4 +61,7 @@ dependencies {
     implementation "androidx.media3:media3-ui:$media3"
     // VLC engine for streams ExoPlayer struggles with (timestamp jumps, odd encodings)
     implementation "org.videolan.android:libvlc-all:3.7.6"
+    // Google Cast (Chromecast / Google TV)
+    implementation "com.google.android.gms:play-services-cast-framework:21.5.0"
+    implementation "androidx.mediarouter:mediarouter:1.7.0"
 }
