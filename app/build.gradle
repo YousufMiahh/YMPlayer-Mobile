@@ -1,0 +1,64 @@
+plugins {
+    id 'com.android.application'
+}
+
+def runNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger()
+
+android {
+    namespace 'com.ymplayer.mobile'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "com.ymplayer.mobile"
+        minSdk 24
+        targetSdk 34
+        versionCode runNumber
+        versionName "1.0.${runNumber}"
+        ndk {
+            // Phones: 32-bit and 64-bit ARM, plus x86_64 for emulators
+            abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86_64'
+        }
+    }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging true
+        }
+    }
+
+    signingConfigs {
+        release {
+            // Fixed key so every new build installs over the previous one as an update.
+            storeFile file("release.keystore")
+            storePassword "xtreamplayer"
+            keyAlias "xtream"
+            keyPassword "xtreamplayer"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+}
+
+dependencies {
+    def media3 = "1.4.1"
+    implementation "androidx.media3:media3-exoplayer:$media3"
+    implementation "androidx.media3:media3-exoplayer-hls:$media3"
+    implementation "androidx.media3:media3-ui:$media3"
+    // VLC engine for streams ExoPlayer struggles with (timestamp jumps, odd encodings)
+    implementation "org.videolan.android:libvlc-all:3.7.6"
+}

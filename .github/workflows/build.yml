@@ -1,0 +1,61 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Find project folder
+        run: |
+          f=$(find . -name settings.gradle -not -path './.git/*' | head -1)
+          if [ -z "$f" ]; then
+            echo "::error::settings.gradle is missing from the repo - please upload it"
+            echo "Files found in repo:"; find . -not -path './.git*' | head -60
+            exit 1
+          fi
+          echo "PROJECT_DIR=$(dirname "$f")" >> "$GITHUB_ENV"
+          echo "Project found in: $(dirname "$f")"
+
+      - name: Build release APK
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          set -o pipefail
+          gradle assembleRelease --no-daemon --stacktrace 2>&1 | tee "$GITHUB_WORKSPACE/build.log"
+
+      - name: Report build errors
+        if: failure()
+        run: |
+          # Surface the real error as one annotation so it can be read without opening the log.
+          msg=$(sed -n '/What went wrong/,/\* Try:/p' build.log | head -60)
+          [ -z "$msg" ] && msg=$(grep -nE "error:|ERROR|Could not|FAILED" build.log | head -40)
+          msg="${msg//'%'/'%25'}"; msg="${msg//$'\n'/'%0A'}"; msg="${msg//$'\r'/'%0D'}"
+          echo "::error title=Build failed::$msg"
+
+      - name: Rename APK
+        run: cp "$PROJECT_DIR/app/build/outputs/apk/release/app-release.apk" YMPlayerMobile.apk
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: YM Player Mobile 1.0.${{ github.run_number }}
+          files: YMPlayerMobile.apk
+          make_latest: true
