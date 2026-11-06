@@ -83,7 +83,9 @@ class BrowsePage extends Page {
         barBox.addView(buildSearchBar(), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         col.addView(barBox);
         count = Ui.oneLine(Ui.text(a, "", 12, Ui.TEXT3));
-        count.setPadding(Ui.dp(a, 18), Ui.dp(a, 8), Ui.dp(a, 16), Ui.dp(a, 8));
+        count.setPadding(Ui.dp(a, 18), 0, Ui.dp(a, 16), Ui.dp(a, 8));
+        count.setVisibility(View.GONE); // only used for search results
+        barBox.setPadding(0, 0, 0, Ui.dp(a, 12));
         col.addView(count);
 
         FrameLayout box = new FrameLayout(a);
@@ -447,8 +449,7 @@ class BrowsePage extends Page {
         adapter.notifyDataSetChanged();
         content.setSelection(0);
         int n = shown.size();
-        String unit = live ? (n == 1 ? "channel" : "channels") : Item.MOVIE.equals(type) ? (n == 1 ? "movie" : "movies") : "series";
-        count.setText(n == 0 ? "" : java.text.NumberFormat.getIntegerInstance(java.util.Locale.UK).format(n) + " " + unit);
+        count.setVisibility(searching ? View.VISIBLE : View.GONE);
         if (n == 0) {
             String what = live ? "channel" : Item.MOVIE.equals(type) ? "movie" : "series";
             if (searching || currentCat == null) emptyText.setText("");
