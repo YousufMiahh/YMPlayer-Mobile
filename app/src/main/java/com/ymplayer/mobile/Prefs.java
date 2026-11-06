@@ -306,6 +306,29 @@ public class Prefs {
         return !removed;
     }
 
+    // ================================================================ favourite categories (per account and section)
+
+    public List<String> favCategories(String type) {
+        List<String> out = new ArrayList<>();
+        try {
+            JSONArray a = new JSONArray(sp.getString(ns() + "favcat_" + type, "[]"));
+            for (int i = 0; i < a.length(); i++) out.add(a.getString(i));
+        } catch (Exception ignored) {
+        }
+        return out;
+    }
+
+    public boolean isFavCategory(String type, String id) { return favCategories(type).contains(id); }
+
+    /** @return true if the category is now a favourite. */
+    public boolean toggleFavCategory(String type, String id) {
+        List<String> l = favCategories(type);
+        boolean now = !l.remove(id);
+        if (now) l.add(id);
+        sp.edit().putString(ns() + "favcat_" + type, new JSONArray(l).toString()).apply();
+        return now;
+    }
+
     // ================================================================ resume positions (per account, ms)
 
     public long position(Item it) { return sp.getLong(ns() + "pos_" + it.key(), 0); }
