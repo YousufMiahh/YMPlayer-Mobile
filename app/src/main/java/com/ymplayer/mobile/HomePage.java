@@ -33,10 +33,10 @@ class HomePage extends Page {
         castBtn.setKind(on ? Icon.Kind.CAST_ON : Icon.Kind.CAST);
         castBtn.setColor(on ? Ui.ACCENT : Ui.TEXT);
     }
-    private LinearLayout localRows, remoteRows, hero;
+    private LinearLayout localRows, remoteRows;
     private TextView empty;
     private List<Item> newMovies, newSeries, topMovies, topSeries;
-    private String topSig = "", heroKey;
+    private String topSig = "";
     private static final long TOP10_EVERY = 60 * 60_000L;
     private final Runnable top10Tick = new Runnable() {
         public void run() {
@@ -80,13 +80,6 @@ class HomePage extends Page {
         }));
         col.addView(top);
 
-        hero = new LinearLayout(a);
-        hero.setOrientation(LinearLayout.VERTICAL);
-        hero.setGravity(Gravity.CENTER_HORIZONTAL);
-        hero.setClipChildren(false);
-        hero.setVisibility(View.GONE);
-        col.addView(hero, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
         localRows = new LinearLayout(a);
         localRows.setOrientation(LinearLayout.VERTICAL);
         localRows.setClipChildren(false);
@@ -106,11 +99,6 @@ class HomePage extends Page {
         startLibrary();
         showCrashNotice();
         return scroll;
-    }
-
-    @Override
-    void onShown() {
-        if (heroKey != null && hero.getTag() instanceof String) Ambient.tint(a, (String) hero.getTag());
     }
 
     @Override
@@ -214,7 +202,6 @@ class HomePage extends Page {
         if (prefs.homeShows("top_series")) add(remoteRows, "Top 10 Series in the UK", topSeries, Cards.Shape.RANKED);
         if (newMovies != null && prefs.homeShows("new_movies")) add(remoteRows, "Recently Added Movies", newMovies, Cards.Shape.POSTER);
         if (newSeries != null && prefs.homeShows("new_series")) add(remoteRows, "Recently Added Series", newSeries, Cards.Shape.POSTER);
-        buildHero();
         updateEmpty();
     }
 
@@ -233,107 +220,6 @@ class HomePage extends Page {
 
     private static List<Item> limit(List<Item> l, int n) {
         return l.size() > n ? l.subList(0, n) : l;
-    }
-
-    // ------------------------------------------------------------ featured title
-
-    /** Netflix-style big poster: the UK's No. 1 film you can watch, else the newest film. */
-    private void buildHero() {
-        if (!prefs.homeShows("hero")) {
-            hero.setVisibility(View.GONE);
-            heroKey = null;
-            return;
-        }
-        Item pickIt = null;
-        if (topMovies != null && !topMovies.isEmpty()) pickIt = topMovies.get(0);
-        else if (topSeries != null && !topSeries.isEmpty()) pickIt = topSeries.get(0);
-        else if (newMovies != null && !newMovies.isEmpty()) pickIt = newMovies.get(0);
-        if (pickIt == null) {
-            hero.setVisibility(View.GONE);
-            return;
-        }
-        if (pickIt.key().equals(heroKey)) return;
-        heroKey = pickIt.key();
-        final Item it = pickIt;
-        hero.removeAllViews();
-        hero.setVisibility(View.VISIBLE);
-
-        int sw = a.getResources().getDisplayMetrics().widthPixels;
-        int w = Math.min((int) (sw * 0.66f), Ui.dp(a, 300)), h = w * 3 / 2;
-        FrameLayout art = new FrameLayout(a);
-        art.setBackground(Ui.rounded(a, Ui.SURFACE, 0, 12));
-        art.setClipToOutline(true);
-        art.setElevation(Ui.dp(a, 16));
-        ImageView img = new ImageView(a);
-        img.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        art.addView(img, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        if (it.icon == null) {
-            TextView ph = Ui.title(a, it.name, 26);
-            ph.setGravity(Gravity.CENTER);
-            ph.setTextColor(Ui.TEXT2);
-            int p = Ui.dp(a, 18);
-            ph.setPadding(p, p, p, p);
-            art.addView(ph, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        }
-        boolean isTop = (topMovies != null && topMovies.contains(it)) || (topSeries != null && topSeries.contains(it));
-        if (isTop) {
-            TextView badge = Ui.medium(a, it.rank > 0 ? "No. " + it.rank + " in the UK" : "Top 10", 12, Ui.W1);
-            badge.setTypeface(Ui.bold());
-            badge.setBackground(Ui.rounded(a, 0xCC000000, 0, 6));
-            badge.setPadding(Ui.dp(a, 8), Ui.dp(a, 4), Ui.dp(a, 8), Ui.dp(a, 4));
-            FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.START);
-            blp.topMargin = blp.leftMargin = Ui.dp(a, 10);
-            art.addView(badge, blp);
-        }
-        Ui.rippleOver(art, 12);
-        art.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { Open.item(a, it, null); }
-        });
-        LinearLayout.LayoutParams alp = new LinearLayout.LayoutParams(w, h);
-        alp.topMargin = Ui.dp(a, 14);
-        hero.addView(art, alp);
-        ImageLoader.load(img, it.icon, 600, 900);
-        hero.setTag(it.icon);
-        if (it.icon != null) Ambient.tint(a, it.icon);
-
-        TextView t = Ui.lines(Ui.title(a, it.name, 20), 2);
-        t.setGravity(Gravity.CENTER);
-        t.setPadding(Ui.dp(a, 24), Ui.dp(a, 14), Ui.dp(a, 24), 0);
-        hero.addView(t);
-        String kind = Item.SERIES.equals(it.type) ? "Series" : "Film";
-        TextView meta = Ui.medium(a, isTop ? kind + "  ·  Top 10 on Netflix UK" : kind + "  ·  Recently added", 13, Ui.TEXT2);
-        meta.setPadding(0, Ui.dp(a, 4), 0, Ui.dp(a, 12));
-        hero.addView(meta);
-
-        LinearLayout btns = new LinearLayout(a);
-        btns.setGravity(Gravity.CENTER);
-        Button play = Ui.primary(a, "▶  Play");
-        play.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                if (Item.MOVIE.equals(it.type)) {
-                    List<Item> q = new ArrayList<>();
-                    q.add(it);
-                    Open.play(a, q, 0);
-                } else {
-                    Open.item(a, it, null);
-                }
-            }
-        });
-        final Button fav = Ui.button(a, "");
-        fav.setText(prefs.isFav(it) ? "♥  Favourite" : "♡  Favourite");
-        fav.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                prefs.toggleFav(it);
-                fav.setText(prefs.isFav(it) ? "♥  Favourite" : "♡  Favourite");
-                buildLocalRows();
-            }
-        });
-        int bw = Math.max(Ui.dp(a, 130), (w - Ui.dp(a, 10)) / 2);
-        LinearLayout.LayoutParams l1 = new LinearLayout.LayoutParams(bw, ViewGroup.LayoutParams.WRAP_CONTENT);
-        l1.rightMargin = Ui.dp(a, 10);
-        btns.addView(play, l1);
-        btns.addView(fav, new LinearLayout.LayoutParams(bw, ViewGroup.LayoutParams.WRAP_CONTENT));
-        hero.addView(btns);
     }
 
     // ------------------------------------------------------------ data
