@@ -32,6 +32,8 @@ class BrowsePage extends Page {
     private LinearLayout bar, searchBar;
     private android.widget.EditText searchBox;
     private boolean searching;
+    private PhoneGuide guideView;
+    private Icon guideToggle;
     private int searchToken;
     private ProgressBar spinner;
     private AbsListView content;
@@ -54,7 +56,14 @@ class BrowsePage extends Page {
     View build() {
         LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);
-        col.addView(header(title(), null));
+        View guideBtn = null;
+        if (live) {
+            guideBtn = iconButton(Icon.Kind.GUIDE, new View.OnClickListener() {
+                public void onClick(View v) { showGuide(guideView.getVisibility() != View.VISIBLE, true); }
+            });
+            guideToggle = (Icon) guideBtn;
+        }
+        col.addView(header(title(), guideBtn));
 
         // [Category ▾]  [♥ Favourites]  [🔍 Search]
         final FrameLayout barBox = new FrameLayout(a);
@@ -125,6 +134,38 @@ class BrowsePage extends Page {
             }
         });
         box.addView(content, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        if (live) {
+            guideView = new PhoneGuide(a);
+            guideView.setVisibility(View.GONE);
+            guideView.setListener(new PhoneGuide.Listener() {
+                public void onChannel(int row) {
+                    if (row < shown.size()) Open.item(a, shown.get(row), shown);
+                }
+
+                public void onProgramme(final int row, XtreamApi.Programme p) {
+                    final Item ch = shown.get(row);
+                    long now = System.currentTimeMillis() / 1000L;
+                    boolean onNow = p.start <= now && now < p.stop;
+                    String sub = p.timeRange() + "  ·  " + ch.name + (onNow ? "  ·  On now" : "")
+                            + (p.desc == null || p.desc.isEmpty() ? "" : "\n\n" + p.desc);
+                    List<Sheet.Option> o = new ArrayList<>();
+                    o.add(new Sheet.Option(onNow ? "Watch now" : "Watch " + ch.name, false, new Runnable() {
+                        public void run() { Open.item(a, ch, shown); }
+                    }));
+                    o.add(new Sheet.Option("Close", false, null));
+                    Sheet.show(a, p.title, sub, o, 0);
+                }
+
+                public void onNeedListings(List<Item> chs) {
+                    Guide.load(api, chs, new Runnable() {
+                        public void run() { if (!a.isFinishing()) guideView.listingsChanged(); }
+                    });
+                }
+            });
+            FrameLayout.LayoutParams glp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+            glp.leftMargin = glp.rightMargin = Ui.dp(a, 8);
+            box.addView(guideView, glp);
+        }
 
         emptyText = Ui.text(a, "", 15, Ui.TEXT2);
         emptyText.setGravity(Gravity.CENTER);
@@ -184,6 +225,7 @@ class BrowsePage extends Page {
                 for (int i = 0; saved != null && i < categories.size(); i++) if (categories.get(i).id.equals(saved)) start = i;
                 if (start < 0) start = !prefs.favs(type).isEmpty() ? 0 : firstReal - 1;
                 openCategory(start);
+                if (live && prefs.raw().getBoolean(prefs.ns() + "m_live_guide", false)) showGuide(true, false);
             }
         });
     }
@@ -426,6 +468,7 @@ class BrowsePage extends Page {
         spinner.setVisibility(View.GONE);
         shown = list == null ? new ArrayList<Item>() : list;
         adapter.notifyDataSetChanged();
+        if (guideView != null && guideView.getVisibility() == View.VISIBLE) guideView.setChannels(shown);
         content.setSelection(0);
         int n = shown.size();
         count.setVisibility(searching ? View.VISIBLE : View.GONE);
@@ -443,6 +486,31 @@ class BrowsePage extends Page {
             content.setAlpha(0f);
             content.setTranslationX(dir * Ui.dp(a, 40));
             content.animate().alpha(1f).translationX(0).setDuration(260).setInterpolator(EASE).start();
+        }
+    }
+
+    // ------------------------------------------------------------ TV guide (Live TV)
+
+    /** Switch between the channel list and the TV guide (remembered for next time). */
+    private void showGuide(boolean on, boolean animate) {
+        if (guideView == null) return;
+        prefs.raw().edit().putBoolean(prefs.ns() + "m_live_guide", on).apply();
+        guideToggle.setKind(on ? Icon.Kind.LIST : Icon.Kind.GUIDE);
+        final View in = on ? guideView : content, out = on ? content : guideView;
+        if (on) guideView.setChannels(shown);
+        in.setVisibility(View.VISIBLE);
+        if (animate) {
+            in.setAlpha(0f);
+            in.setTranslationY(Ui.dp(a, 24));
+            in.animate().alpha(1f).translationY(0).setDuration(260).setInterpolator(EASE).start();
+            out.animate().alpha(0f).setDuration(160).withEndAction(new Runnable() {
+                public void run() {
+                    out.setVisibility(View.GONE);
+                    out.setAlpha(1f);
+                }
+            }).start();
+        } else {
+            out.setVisibility(View.GONE);
         }
     }
 

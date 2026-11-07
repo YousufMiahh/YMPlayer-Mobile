@@ -107,6 +107,17 @@ public class SettingsActivity extends Activity {
             }
         });
 
+        section("Customise Home Screen");
+        for (int i = 0; i < Prefs.HOME_KEYS.length; i++) {
+            final String key = Prefs.HOME_KEYS[i];
+            row(Prefs.HOME_NAMES[i], prefs.homeShows(key) ? "On" : "Off", new Action() {
+                public void run(TextView v) {
+                    prefs.setHomeShows(key, !prefs.homeShows(key));
+                    v.setText(prefs.homeShows(key) ? "On" : "Off");
+                }
+            });
+        }
+
         section("Subtitles");
         row("Size", SUB_SIZES[prefs.subtitleSize()], new Action() {
             public void run(TextView v) {
