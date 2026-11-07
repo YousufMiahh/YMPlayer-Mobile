@@ -228,30 +228,7 @@ class SearchPage extends Page {
         Async.runOn(MATCHER, new Async.Work<List<Item>>() {
             public List<Item> run() {
                 if (t != token) return null;
-                String qc = Item.squash(q);
-                List<String> words = new ArrayList<>();
-                for (String w : q.split("\\s+")) {
-                    String sw = Item.squash(w);
-                    if (!sw.isEmpty()) words.add(sw);
-                }
-                List<Item> starts = new ArrayList<>(), contains = new ArrayList<>();
-                if (qc.length() < 2 || words.isEmpty()) return starts;
-                int n = 0;
-                for (Item it : all) {
-                    if ((++n & 1023) == 0 && t != token) return null;
-                    String c = it.compact();
-                    boolean hit = c.contains(qc);
-                    if (!hit && words.size() > 1) {
-                        hit = true;
-                        for (String w : words) if (!c.contains(w)) { hit = false; break; }
-                    }
-                    if (!hit) continue;
-                    if (c.startsWith(qc) || it.wordStartsWith(words.get(0))) starts.add(it);
-                    else if (contains.size() < MAX) contains.add(it);
-                    if (starts.size() >= MAX) break;
-                }
-                starts.addAll(contains);
-                return starts.size() > MAX ? new ArrayList<>(starts.subList(0, MAX)) : starts;
+                return Match.rank(all, q, MAX, null); // best matches first (see Match)
             }
         }, new Async.Done<List<Item>>() {
             public void done(final List<Item> hits, Exception e) {

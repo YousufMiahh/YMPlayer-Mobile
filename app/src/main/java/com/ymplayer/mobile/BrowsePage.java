@@ -354,29 +354,8 @@ class BrowsePage extends Page {
         Async.run(new Async.Work<List<Item>>() {
             public List<Item> run() throws Exception {
                 List<Item> all = Repo.streams(api, type, null);
-                String qc = Item.squash(q);
-                List<String> words = new ArrayList<>();
-                for (String w : q.split("\\s+")) {
-                    String sw = Item.squash(w);
-                    if (!sw.isEmpty()) words.add(sw);
-                }
-                List<Item> starts = new ArrayList<>(), contains = new ArrayList<>();
-                int n = 0;
-                for (Item it : all) {
-                    if ((++n & 1023) == 0 && t != searchToken) return null;
-                    String c = it.compact();
-                    boolean hit = c.contains(qc);
-                    if (!hit && words.size() > 1) {
-                        hit = true;
-                        for (String w : words) if (!c.contains(w)) { hit = false; break; }
-                    }
-                    if (!hit) continue;
-                    if (c.startsWith(qc) || it.wordStartsWith(words.get(0))) starts.add(it);
-                    else contains.add(it);
-                    if (starts.size() + contains.size() >= 300) break;
-                }
-                starts.addAll(contains);
-                return starts;
+                if (t != searchToken) return null;
+                return Match.rank(all, q, 300, null); // best matches first (see Match)
             }
         }, new Async.Done<List<Item>>() {
             public void done(List<Item> r, Exception e) {
