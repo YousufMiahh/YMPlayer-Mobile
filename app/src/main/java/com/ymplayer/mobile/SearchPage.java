@@ -228,7 +228,7 @@ class SearchPage extends Page {
         Async.runOn(MATCHER, new Async.Work<List<Item>>() {
             public List<Item> run() {
                 if (t != token) return null;
-                return Match.rank(all, q, MAX, null); // best matches first (see Match)
+                return Match.rank(Filters.items(api, prefs, TYPES[slot], all), q, MAX, null); // best matches first, hidden categories left out
             }
         }, new Async.Done<List<Item>>() {
             public void done(final List<Item> hits, Exception e) {

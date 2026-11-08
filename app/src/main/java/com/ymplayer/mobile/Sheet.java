@@ -32,6 +32,13 @@ public final class Sheet {
         public Option(String label, boolean checked, Runnable action) { this(label, checked, action, false); }
 
         boolean inert;
+        Runnable longPress;
+
+        /** Something to do when the row is pressed and held. */
+        public Option longPress(Runnable r) {
+            longPress = r;
+            return this;
+        }
 
         /** A row that's just information (tapping it does nothing). */
         public Option inert() {
@@ -176,6 +183,16 @@ public final class Sheet {
             }
         };
         list.setAdapter(adapter);
+        list.setOnItemLongClickListener(new android.widget.AdapterView.OnItemLongClickListener() {
+            public boolean onItemLongClick(android.widget.AdapterView<?> p, View v, int i, long id) {
+                final Runnable lp = visible.get(i).longPress;
+                if (lp == null) return false;
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                close();
+                Async.MAIN.postDelayed(lp, 230); // after this sheet has slid away
+                return true;
+            }
+        });
         list.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
             public void onItemClick(android.widget.AdapterView<?> p, View v, int i, long id) {
                 if (visible.get(i).inert) return;

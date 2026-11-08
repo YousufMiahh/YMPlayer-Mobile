@@ -187,8 +187,14 @@ class BrowsePage extends Page {
     @Override
     void onReselect() { content.smoothScrollToPosition(0); }
 
+    private int filterVersion;
+
     @Override
     void onResume() {
+        if (filterVersion != 0 && filterVersion != Filters.version()) { // changed in Settings
+            loadCategories();
+            return;
+        }
         // Favourites / recent / continue lists may have changed while you were away
         if (searching) {
             adapter.notifyDataSetChanged();
@@ -203,11 +209,12 @@ class BrowsePage extends Page {
     private void loadCategories() {
         spinner.setVisibility(View.VISIBLE);
         Async.run(new Async.Work<List<Item>>() {
-            public List<Item> run() throws Exception { return Repo.categories(api, type); }
+            public List<Item> run() throws Exception { return Filters.categories(prefs, type, Repo.categories(api, type)); } // hidden ones left out
         }, new Async.Done<List<Item>>() {
             public void done(List<Item> cats, Exception e) {
                 if (a.isFinishing()) return;
                 spinner.setVisibility(View.GONE);
+                filterVersion = Filters.version();
                 categories.clear();
                 categories.add(new Item(Item.CATEGORY, FAV, live ? "Favourite Channels" : Item.MOVIE.equals(type) ? "Favourite Movies" : "Favourite Series"));
                 if (live) categories.add(new Item(Item.CATEGORY, RECENT, "Recent Channels"));
@@ -244,10 +251,24 @@ class BrowsePage extends Page {
                 opt.heart(prefs.isFavCategory(type, c.id), new Runnable() {
                     public void run() { prefs.toggleFavCategory(type, c.id); }
                 });
+                opt.longPress(new Runnable() { // press and hold: hide it
+                    public void run() {
+                        List<Sheet.Option> h = new ArrayList<>();
+                        h.add(new Sheet.Option("Hide this category", false, new Runnable() {
+                            public void run() {
+                                Filters.setCategoryHidden(prefs, type, c.id, true);
+                                android.widget.Toast.makeText(a, "Hidden — bring it back in Settings → Hidden Categories", android.widget.Toast.LENGTH_LONG).show();
+                                loadCategories();
+                            }
+                        }, true));
+                        h.add(new Sheet.Option("Cancel", false, null));
+                        Sheet.show(a, c.name, null, h, 0);
+                    }
+                });
             }
             o.add(opt);
         }
-        Sheet.show(a, title() + " categories", null, o, currentIndex, "Search categories");
+        Sheet.show(a, title() + " categories", "Tap ♡ to favourite  ·  press and hold to hide", o, currentIndex, "Search categories");
     }
 
     /** Just the categories you've hearted. */
@@ -395,7 +416,7 @@ class BrowsePage extends Page {
         spinner.setVisibility(View.VISIBLE);
         Async.run(new Async.Work<List<Item>>() {
             public List<Item> run() throws Exception {
-                List<Item> all = Repo.streams(api, type, null);
+                List<Item> all = Filters.items(api, prefs, type, Repo.streams(api, type, null));
                 if (t != searchToken) return null;
                 return Match.rank(all, q, 300, null); // best matches first (see Match)
             }
@@ -446,8 +467,12 @@ class BrowsePage extends Page {
         spinner.setVisibility(View.VISIBLE);
         Async.run(new Async.Work<List<Item>>() {
             public List<Item> run() throws Exception {
-                if (NEW.equals(cat.id)) return Repo.recentlyAdded(api, type, 60);
-                return Repo.streams(api, type, ALL.equals(cat.id) ? null : cat.id);
+                if (NEW.equals(cat.id)) {
+                    List<Item> l = Filters.items(api, prefs, type, Repo.recentlyAdded(api, type, 300));
+                    return l.size() > 60 ? new ArrayList<>(l.subList(0, 60)) : l;
+                }
+                if (ALL.equals(cat.id)) return Filters.items(api, prefs, type, Repo.streams(api, type, null));
+                return Repo.streams(api, type, cat.id);
             }
         }, new Async.Done<List<Item>>() {
             public void done(List<Item> list, Exception e) {

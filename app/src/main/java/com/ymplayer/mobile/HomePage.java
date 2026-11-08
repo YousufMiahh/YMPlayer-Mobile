@@ -265,11 +265,17 @@ class HomePage extends Page {
         }
     }
 
+    /** Newest 24, leaving out hidden categories and countries. */
+    private List<Item> recent(String type) throws java.io.IOException {
+        List<Item> l = Filters.items(api, prefs, type, Repo.recentlyAdded(api, type, 300));
+        return l.size() > 24 ? new ArrayList<>(l.subList(0, 24)) : l;
+    }
+
     private void loadNewArrivals() {
         Async.run(new Async.Work<List<Item>[]>() {
             @SuppressWarnings("unchecked")
             public List<Item>[] run() throws Exception {
-                return new List[]{Repo.recentlyAdded(api, Item.MOVIE, 24), Repo.recentlyAdded(api, Item.SERIES, 24)};
+                return new List[]{recent(Item.MOVIE), recent(Item.SERIES)};
             }
         }, new Async.Done<List<Item>[]>() {
             public void done(List<Item>[] r, Exception e) {
