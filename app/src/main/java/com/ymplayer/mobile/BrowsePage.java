@@ -546,7 +546,9 @@ class BrowsePage extends Page {
         prefs.raw().edit().putBoolean(prefs.ns() + "m_live_guide", on).apply();
         guideToggle.setKind(on ? Icon.Kind.LIST : Icon.Kind.GUIDE);
         final View in = on ? guideView : content, out = on ? content : guideView;
-        if (on) guideView.setChannels(shown);
+        // Keep your place: the guide opens at the channel you'd scrolled to, and the list at the guide's
+        if (on) guideView.setChannels(shown, content.getFirstVisiblePosition());
+        else ((ListView) content).setSelection(Math.min(guideView.firstVisibleRow(), Math.max(0, shown.size() - 1)));
         in.setVisibility(View.VISIBLE);
         if (animate) {
             in.setAlpha(0f);

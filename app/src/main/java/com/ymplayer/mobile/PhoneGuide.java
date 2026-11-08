@@ -86,14 +86,27 @@ public class PhoneGuide extends View {
 
     public void setListener(Listener l) { listener = l; }
 
-    public void setChannels(List<Item> list) {
+    public void setChannels(List<Item> list) { setChannels(list, 0); }
+
+    /** @param firstRow the channel to start at (where you were in the list). */
+    public void setChannels(List<Item> list, int firstRow) {
         channels = list == null ? new ArrayList<Item>() : list;
-        scrollY = 0;
+        scrollY = Math.max(0, firstRow) * rowH;
+        if (getHeight() > 0) scrollY = Math.min(scrollY, maxY());
         jumpToNow();
         post(askListings);
     }
 
     public void listingsChanged() { invalidate(); }
+
+    /** The channel at the top of the guide (to keep your place when switching back to the list). */
+    public int firstVisibleRow() { return (int) (scrollY / rowH + 0.5f); }
+
+    @Override
+    protected void onLayout(boolean changed, int l, int t, int r, int b) {
+        super.onLayout(changed, l, t, r, b);
+        if (scrollY > maxY()) scrollY = maxY();
+    }
 
     private void jumpToNow() {
         long now = System.currentTimeMillis() / 1000L;

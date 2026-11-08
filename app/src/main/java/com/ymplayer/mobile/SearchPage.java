@@ -73,6 +73,24 @@ class SearchPage extends Page {
         field.addView(clear, new FrameLayout.LayoutParams(Ui.dp(a, 44), Ui.dp(a, 44), Gravity.END | Gravity.CENTER_VERTICAL));
         page.addView(field);
 
+        // All | Live TV | Movies | Series
+        LinearLayout chipRow = new LinearLayout(a);
+        chipRow.setPadding(Ui.dp(a, 16), 0, Ui.dp(a, 16), Ui.dp(a, 6));
+        for (int i = 0; i < 4; i++) {
+            final int f = i;
+            chips[i] = Ui.oneLine(Ui.medium(a, CHIP_NAMES[i], 13.5f, Ui.TEXT));
+            int px = Ui.dp(a, 14), py = Ui.dp(a, 7);
+            chips[i].setPadding(px, py, px, py);
+            chips[i].setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) { setFilter(f); }
+            });
+            LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            cl.rightMargin = Ui.dp(a, 8);
+            chipRow.addView(chips[i], cl);
+        }
+        page.addView(chipRow);
+        paintChips();
+
         scroll = new ScrollView(a);
         scroll.setVerticalScrollBarEnabled(false);
         scroll.setClipChildren(false);
@@ -197,11 +215,38 @@ class SearchPage extends Page {
 
     private String query() { return box.getText().toString().trim().toLowerCase(Locale.UK); }
 
+    /** 0 = All, 1 = Live TV, 2 = Movies, 3 = Series. */
+    private int filter;
+    private final TextView[] chips = new TextView[4];
+    private static final String[] CHIP_NAMES = {"All", "Live TV", "Movies", "Series"};
+    private static final int GRID_MAX = 120;
+
+    private void paintChips() {
+        for (int i = 0; i < 4; i++) {
+            boolean on = i == filter;
+            android.graphics.drawable.GradientDrawable g = Ui.rounded(a, on ? Ui.FOCUS_BG : 0, 0, 16);
+            if (!on) g.setStroke(Ui.dp(a, 1), Ui.DARK ? 0x66EBEBF5 : 0x553C3C43);
+            Ui.ripple(chips[i], g, 16);
+            chips[i].setTextColor(on ? Ui.ON_FOCUS : Ui.TEXT);
+            chips[i].setTypeface(on ? Ui.semibold() : Ui.medium());
+        }
+    }
+
+    /** Show only one type; it then fills the screen as a grid. */
+    private void setFilter(int f) {
+        if (f == filter) return;
+        filter = f;
+        paintChips();
+        search();
+    }
+
+    private boolean shows(int slot) { return filter == 0 || filter == slot + 1; }
+
     private void search() {
         token++;
         for (int i = 0; i < 3; i++) {
             found[i] = 0;
-            if (query().length() < 2) slots[i].removeAllViews();
+            if (query().length() < 2 || !shows(i)) slots[i].removeAllViews();
             else if (ready[i]) searchSlot(i, query(), token);
         }
         updateStatus();
@@ -222,13 +267,15 @@ class SearchPage extends Page {
     }
 
     private void searchSlot(final int slot, final String q, final int t) {
-        if (q.length() < 2) return;
+        if (q.length() < 2 || !shows(slot)) return;
+        final boolean asGrid = filter != 0;
+        final int max = asGrid ? GRID_MAX : MAX;
         final List<Item> all = Repo.cached(TYPES[slot], null);
         if (all == null) return;
         Async.runOn(MATCHER, new Async.Work<List<Item>>() {
             public List<Item> run() {
                 if (t != token) return null;
-                return Match.rank(Filters.items(api, prefs, TYPES[slot], all), q, MAX, null); // best matches first, hidden categories left out
+                return Match.rank(Filters.items(api, prefs, TYPES[slot], all), q, max, null); // best matches first, hidden categories left out
             }
         }, new Async.Done<List<Item>>() {
             public void done(final List<Item> hits, Exception e) {
@@ -237,17 +284,18 @@ class SearchPage extends Page {
                 found[slot] = hits.size();
                 if (!hits.isEmpty()) {
                     Cards.Shape shape = slot == 0 ? Cards.Shape.CHANNEL : Cards.Shape.POSTER;
-                    slots[slot].addView(Cards.shelf(a, TITLES[slot] + "  ·  " + hits.size() + (hits.size() >= MAX ? "+" : ""),
-                            hits, shape, prefs,
-                            new Cards.OnPick() {
-                                public void pick(Item it, View card) {
-                                    hideKeyboard();
-                                    Open.item(a, it, hits);
-                                }
-                            },
-                            new Cards.OnMenu() {
-                                public void menu(Item it, View card) { toggleFavMenu(it); }
-                            }));
+                    String heading = TITLES[slot] + "  ·  " + hits.size() + (hits.size() >= max ? "+" : "");
+                    Cards.OnPick onPick = new Cards.OnPick() {
+                        public void pick(Item it, View card) {
+                            hideKeyboard();
+                            Open.item(a, it, hits);
+                        }
+                    };
+                    Cards.OnMenu onMenu = new Cards.OnMenu() {
+                        public void menu(Item it, View card) { toggleFavMenu(it); }
+                    };
+                    if (asGrid) slots[slot].addView(Cards.grid(a, heading, hits, shape, prefs, onPick, onMenu));
+                    else slots[slot].addView(Cards.shelf(a, heading, hits, shape, prefs, onPick, onMenu));
                 }
                 updateStatus();
             }

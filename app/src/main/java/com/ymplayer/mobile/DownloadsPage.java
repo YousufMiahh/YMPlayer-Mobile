@@ -69,11 +69,12 @@ class DownloadsPage extends Page {
         empty.addView(circle, new LinearLayout.LayoutParams(Ui.dp(a, 96), Ui.dp(a, 96)));
         TextView t = Ui.title(a, "Nothing downloaded yet", 18);
         t.setPadding(0, Ui.dp(a, 18), 0, Ui.dp(a, 6));
-        empty.addView(t);
+        t.setGravity(Gravity.CENTER);
+        empty.addView(t, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         TextView s = Ui.text(a, "Tap Download on any movie or episode to watch it without a connection — on a train, a plane or anywhere with poor signal.", 14, Ui.TEXT2);
         s.setGravity(Gravity.CENTER);
         s.setLineSpacing(0, 1.3f);
-        empty.addView(s);
+        empty.addView(s, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         col.addView(empty);
 
         scroll.addView(col);

@@ -195,6 +195,50 @@ public final class Cards {
         return box;
     }
 
+    /** A titled grid of cards wrapping across the screen (search narrowed to one type). */
+    public static LinearLayout grid(final Context c, CharSequence title, final List<Item> items, final Shape shape,
+                                    final Prefs prefs, final OnPick pick, final OnMenu menu) {
+        LinearLayout box = new LinearLayout(c);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setClipChildren(false);
+        TextView h = Ui.text(c, "", 17, Ui.TEXT);
+        h.setText(title);
+        h.setTypeface(Ui.bold());
+        h.setPadding(Ui.dp(c, 16), Ui.dp(c, 18), Ui.dp(c, 16), Ui.dp(c, 4));
+        box.addView(h);
+        int gap = Ui.dp(c, 8), side = Ui.dp(c, 16);
+        int usable = c.getResources().getDisplayMetrics().widthPixels - 2 * side;
+        int cols = Math.max(2, (usable + gap) / (width(c, shape) + gap));
+        LinearLayout row = null;
+        for (int i = 0; i < items.size(); i++) {
+            if (i % cols == 0) {
+                row = new LinearLayout(c);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                row.setPadding(side, Ui.dp(c, 10), side, 0);
+                box.addView(row);
+            }
+            final Item it = items.get(i);
+            String name = Item.EPISODE.equals(it.type) && it.num != null ? "E" + it.num + " · " + it.name : it.name;
+            LinearLayout card = card(c, shape, it.icon, name, null, 0, 0);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.rightMargin = gap;
+            row.addView(card, lp);
+            card.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) { pick.pick(it, v); }
+            });
+            if (menu != null) {
+                card.setOnLongClickListener(new View.OnLongClickListener() {
+                    public boolean onLongClick(View v) {
+                        v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                        menu.menu(it, v);
+                        return true;
+                    }
+                });
+            }
+        }
+        return box;
+    }
+
     /** "Title    hint" with the hint small and grey. */
     public static CharSequence titleWithHint(String title, String hint) {
         android.text.SpannableStringBuilder b = new android.text.SpannableStringBuilder(title).append("    ");
