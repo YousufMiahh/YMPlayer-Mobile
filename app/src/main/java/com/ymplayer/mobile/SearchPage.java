@@ -283,7 +283,7 @@ class SearchPage extends Page {
         Async.runOn(MATCHER, new Async.Work<List<Item>>() {
             public List<Item> run() {
                 if (t != token) return null;
-                return Match.rank(Filters.items(api, prefs, TYPES[slot], all), q, max, null); // best matches first, hidden categories left out
+                return Match.rank(Filters.searchItems(api, prefs, TYPES[slot], all), q, max, null); // best matches first; hidden countries / languages left out
             }
         }, new Async.Done<List<Item>>() {
             public void done(final List<Item> hits, Exception e) {

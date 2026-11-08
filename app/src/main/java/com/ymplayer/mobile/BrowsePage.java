@@ -437,7 +437,7 @@ class BrowsePage extends Page {
         spinner.setVisibility(View.VISIBLE);
         Async.run(new Async.Work<List<Item>>() {
             public List<Item> run() throws Exception {
-                List<Item> all = Filters.items(api, prefs, type, Repo.streams(api, type, null));
+                List<Item> all = Filters.searchItems(api, prefs, type, Repo.streams(api, type, null));
                 if (t != searchToken) return null;
                 return Match.rank(all, q, 300, null); // best matches first (see Match)
             }
