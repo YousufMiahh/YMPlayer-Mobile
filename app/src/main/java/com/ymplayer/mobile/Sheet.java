@@ -33,10 +33,18 @@ public final class Sheet {
 
         boolean inert;
         Runnable longPress;
+        boolean longPressRemoves;
 
         /** Something to do when the row is pressed and held. */
         public Option longPress(Runnable r) {
             longPress = r;
+            return this;
+        }
+
+        /** Pressing and holding does this and takes the row away, leaving the sheet open (e.g. hide a category). */
+        public Option longPressRemoves(Runnable r) {
+            longPress = r;
+            longPressRemoves = true;
             return this;
         }
 
@@ -185,9 +193,20 @@ public final class Sheet {
         list.setAdapter(adapter);
         list.setOnItemLongClickListener(new android.widget.AdapterView.OnItemLongClickListener() {
             public boolean onItemLongClick(android.widget.AdapterView<?> p, View v, int i, long id) {
-                final Runnable lp = visible.get(i).longPress;
+                final Option o = visible.get(i);
+                final Runnable lp = o.longPress;
                 if (lp == null) return false;
                 v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                if (o.longPressRemoves) {
+                    lp.run();
+                    visible.remove(o);
+                    try {
+                        options.remove(o);
+                    } catch (UnsupportedOperationException ignored) {
+                    }
+                    adapter.notifyDataSetChanged();
+                    return true;
+                }
                 close();
                 Async.MAIN.postDelayed(lp, 230); // after this sheet has slid away
                 return true;

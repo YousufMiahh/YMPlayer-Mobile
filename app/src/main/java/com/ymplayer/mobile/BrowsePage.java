@@ -269,24 +269,21 @@ class BrowsePage extends Page {
             final int idx = i;
             final Item c = categories.get(i);
             Sheet.Option opt = new Sheet.Option(c.name, i == currentIndex, new Runnable() {
-                public void run() { openCategory(idx); }
+                public void run() { // by id: the list may have changed (a category hidden) since the sheet opened
+                    for (int k = 0; k < categories.size(); k++) if (categories.get(k).id.equals(c.id)) { openCategory(k); return; }
+                }
             });
             if (!c.id.startsWith("__")) {
                 opt.heart(prefs.isFavCategory(type, c.id), new Runnable() {
                     public void run() { prefs.toggleFavCategory(type, c.id); }
                 });
-                opt.longPress(new Runnable() { // press and hold: hide it
+                opt.longPressRemoves(new Runnable() { // press and hold: hidden straight away
                     public void run() {
-                        List<Sheet.Option> h = new ArrayList<>();
-                        h.add(new Sheet.Option("Hide this category", false, new Runnable() {
-                            public void run() {
-                                Filters.setCategoryHidden(prefs, type, c.id, true);
-                                android.widget.Toast.makeText(a, "Hidden — bring it back in Settings → Hidden Categories", android.widget.Toast.LENGTH_LONG).show();
-                                loadCategories();
-                            }
-                        }, true));
-                        h.add(new Sheet.Option("Cancel", false, null));
-                        Sheet.show(a, c.name, null, h, 0);
+                        Filters.setCategoryHidden(prefs, type, c.id, true);
+                        if (prefs.isFavCategory(type, c.id)) prefs.toggleFavCategory(type, c.id);
+                        android.widget.Toast.makeText(a, "Hidden: " + c.name + "  (Settings → Hidden Categories to bring it back)",
+                                android.widget.Toast.LENGTH_SHORT).show();
+                        loadCategories();
                     }
                 });
             }
