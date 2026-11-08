@@ -242,8 +242,13 @@ class SearchPage extends Page {
 
     private boolean shows(int slot) { return filter == 0 || filter == slot + 1; }
 
+    /** Which sections have finished for the current search, and which found something. */
+    private int doneMask, hitMask;
+
     private void search() {
         token++;
+        doneMask = 0;
+        hitMask = 0;
         for (int i = 0; i < 3; i++) {
             found[i] = 0;
             if (query().length() < 2 || !shows(i)) slots[i].removeAllViews();
@@ -266,9 +271,12 @@ class SearchPage extends Page {
         status.setVisibility(status.getText().length() == 0 ? View.GONE : View.VISIBLE);
     }
 
-    private void searchSlot(final int slot, final String q, final int t) {
+    private void searchSlot(final int slot, final String q, final int t) { searchSlot(slot, q, t, false); }
+
+    /** @param forceGrid "All" found results in only this section: show them as a full grid. */
+    private void searchSlot(final int slot, final String q, final int t, final boolean forceGrid) {
         if (q.length() < 2 || !shows(slot)) return;
-        final boolean asGrid = filter != 0;
+        final boolean asGrid = filter != 0 || forceGrid;
         final int max = asGrid ? GRID_MAX : MAX;
         final List<Item> all = Repo.cached(TYPES[slot], null);
         if (all == null) return;
@@ -298,6 +306,16 @@ class SearchPage extends Page {
                     else slots[slot].addView(Cards.shelf(a, heading, hits, shape, prefs, onPick, onMenu));
                 }
                 updateStatus();
+                if (filter == 0 && !forceGrid) {
+                    doneMask |= 1 << slot;
+                    if (!hits.isEmpty()) hitMask |= 1 << slot;
+                    boolean allDone = true;
+                    for (int k = 0; k < 3; k++) if (ready[k] && (doneMask & (1 << k)) == 0) allDone = false;
+                    if (allDone && ready[0] && ready[1] && ready[2] && Integer.bitCount(hitMask) == 1) {
+                        // Only one section had anything: lay it out as the full grid, like picking that section
+                        searchSlot(Integer.numberOfTrailingZeros(hitMask), q, t, true);
+                    }
+                }
             }
         });
     }
