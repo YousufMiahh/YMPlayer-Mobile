@@ -236,6 +236,13 @@ public class SettingsActivity extends Activity {
             }
         });
 
+        row("Show Tutorial", "Quick tour of the basics", new Action() {
+            public void run(TextView v) {
+                Coach.restart(SettingsActivity.this);
+                restartHome();
+            }
+        });
+
         section("About");
         String ver = "";
         try {

@@ -22,6 +22,17 @@ import java.util.List;
  */
 class HomePage extends Page {
     private ScrollView scroll;
+
+    /** For the tutorial: the Cast and Settings buttons, and the first row of cards. */
+    private View iconsBox;
+
+    View topIcons() { return iconsBox; }
+
+    View firstRow() {
+        if (localRows != null && localRows.getChildCount() > 0) return localRows.getChildAt(0);
+        if (remoteRows != null && remoteRows.getChildCount() > 0) return remoteRows.getChildAt(0);
+        return null;
+    }
     private Icon castBtn;
     private final Cast.Changes castChanges = new Cast.Changes() {
         void changed(boolean on) { paintCast(); }
@@ -74,10 +85,13 @@ class HomePage extends Page {
         castBtn = (Icon) iconButton(Icon.Kind.CAST, new View.OnClickListener() {
             public void onClick(View v) { Cast.pick(a); }
         });
-        top.addView(castBtn);
-        top.addView(iconButton(Icon.Kind.SETTINGS, new View.OnClickListener() {
+        LinearLayout icons = new LinearLayout(a); // Cast + Settings together (highlighted together by the tutorial)
+        icons.addView(castBtn);
+        icons.addView(iconButton(Icon.Kind.SETTINGS, new View.OnClickListener() {
             public void onClick(View v) { a.startActivity(new Intent(a, SettingsActivity.class)); }
         }));
+        top.addView(icons);
+        iconsBox = icons;
         col.addView(top);
 
         localRows = new LinearLayout(a);

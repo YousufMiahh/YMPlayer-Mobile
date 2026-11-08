@@ -1001,6 +1001,10 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         Cast.listen(this, castChanges, true);
         paintCast();
         play(true);
+        if (firstStart) Coach.show(this, "m_player", false, new Coach.Step(null, "Watching",
+                "Tap for controls.\nDouble-tap the left side to go back 5 seconds, the right side to go forward 10 seconds.\n"
+                        + "Drag the bar to jump around.\nOn Live TV, swipe up or down to change channel.\n"
+                        + "The Cast button is at the top right, and pressing Home keeps it playing in a small window."));
         firstStart = false;
         Async.MAIN.post(ticker);
         Async.MAIN.postDelayed(watchdog, 1000);
@@ -1401,6 +1405,7 @@ public class PlayerActivity extends Activity implements Engine.Listener {
 
     @Override
     public void onBackPressed() {
+        if (Coach.back(this)) return;
         if (videoHost != null && panelOpen()) {
             hidePanels();
             return;

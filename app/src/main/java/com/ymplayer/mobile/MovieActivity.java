@@ -132,6 +132,9 @@ public class MovieActivity extends Activity {
             }
         }));
         DownloadButton dl = new DownloadButton(this, api, movie, true);
+        Coach.show(this, "m_movie", false,
+                new Coach.Step(playBtn, "Play", "Starts the film, or carries on where you left off."),
+                new Coach.Step(dl, "Download", "Saves the film to your phone to watch without internet. Downloads are in the Downloads tab."));
         actions.addView(dl, new LinearLayout.LayoutParams(Ui.dp(this, 84), ViewGroup.LayoutParams.WRAP_CONTENT));
         if (trailer != null) {
             actions.addView(DetailUi.action(this, Icon.Kind.TRAILER, "Trailer", Ui.TEXT, new View.OnClickListener() {

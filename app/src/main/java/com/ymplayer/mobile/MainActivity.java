@@ -54,7 +54,8 @@ public class MainActivity extends Activity {
         FrameLayout.LayoutParams plp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         plp.bottomMargin = navH;
         root.addView(pages, plp);
-        root.addView(buildNav(), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, navH, Gravity.BOTTOM));
+        navBar = buildNav();
+        root.addView(navBar, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, navH, Gravity.BOTTOM));
         setContentView(root);
 
         page[HOME] = new HomePage(this);
@@ -65,6 +66,32 @@ public class MainActivity extends Activity {
         page[SEARCH] = new SearchPage(this);
         int start = b != null ? b.getInt("tab", HOME) : HOME;
         select(start, false);
+        Async.MAIN.postDelayed(new Runnable() { // once Home has filled in
+            public void run() {
+                if (isFinishing()) return;
+                Coach.offer(MainActivity.this, false, new Runnable() { public void run() { homeTour(); } });
+            }
+        }, 1500);
+    }
+
+    private View navBar;
+
+    /** Quick-start tips (Settings → Show Tutorial runs them again). */
+    private void homeTour() {
+        if (current != HOME) return;
+        HomePage h = (HomePage) page[HOME];
+        Coach.show(this, "m_home", false,
+                new Coach.Step(navBar, "Getting around",
+                        "Home, Live TV, Movies, Series, Downloads and Search are along the bottom. Tap a tab again to jump back to the top."),
+                new Coach.Step(h.topIcons(), "Cast & Settings",
+                        "Cast sends what you're watching to a Chromecast or Google TV. Settings lets you choose what Home shows, "
+                                + "hide countries and categories you don't watch, and switch accounts."),
+                new Coach.Step(h.firstRow(), "Your Home screen",
+                        "Continue Watching, recent channels, favourites and the UK Top 10. Press and hold any card for more options, "
+                                + "like removing it from Continue Watching."),
+                new Coach.Step(null, "Watching",
+                        "Videos turn sideways to fill the screen. Tap for controls, double-tap the left or right side to skip, "
+                                + "and press Home while watching to keep it playing in a small window."));
     }
 
     private View buildNav() {
@@ -214,6 +241,7 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
+        if (Coach.back(this)) return;
         if (Sheet.dismiss(this)) return;
         if (current >= 0 && page[current].onBack()) return;
         if (current != HOME) {

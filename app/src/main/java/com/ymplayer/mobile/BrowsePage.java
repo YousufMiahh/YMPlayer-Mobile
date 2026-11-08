@@ -33,6 +33,7 @@ class BrowsePage extends Page {
     private android.widget.EditText searchBox;
     private boolean searching;
     private PhoneGuide guideView;
+    private View buttonsRow;
     private Icon guideToggle;
     private int searchToken;
     private ProgressBar spinner;
@@ -88,6 +89,7 @@ class BrowsePage extends Page {
         LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         sl.leftMargin = Ui.dp(a, 8);
         bar.addView(find, sl);
+        buttonsRow = bar;
         barBox.addView(bar, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         barBox.addView(buildSearchBar(), new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         col.addView(barBox);
@@ -182,6 +184,28 @@ class BrowsePage extends Page {
 
         loadCategories();
         return col;
+    }
+
+    @Override
+    void onShown() {
+        // Quick-start tips the first time (while the tutorial is on)
+        if (live) {
+            Coach.show(a, "m_live", false,
+                    new Coach.Step(buttonsRow, "Find channels",
+                            "Pick a category, open your favourite categories, or search just Live TV. In the category list, tap ♡ to "
+                                    + "favourite a category or press and hold it to hide it."),
+                    new Coach.Step(guideToggle, "TV guide",
+                            "Switch between the channel list and the TV guide. In the guide, drag to move through channels and time; "
+                                    + "tap a programme for details or a logo to watch."),
+                    new Coach.Step(content, "Channels",
+                            "Tap a channel to watch. Tap the heart to add it to your favourites."));
+        } else {
+            Coach.show(a, "m_vod", false,
+                    new Coach.Step(buttonsRow, "Find something to watch",
+                            "Pick a category, open your favourite categories, or search just this section."),
+                    new Coach.Step(content, "Posters",
+                            "Tap for details, with Play, Download and the trailer. Press and hold to add it to your favourites."));
+        }
     }
 
     @Override
