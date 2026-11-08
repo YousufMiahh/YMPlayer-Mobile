@@ -36,12 +36,25 @@ public final class Cards {
 
     /** One card: rounded artwork + title (+ optional subtitle and progress). */
     public static LinearLayout card(Context c, Shape shape, String image, String title, String subtitle, float progress, int rank) {
+        return card(c, shape, image, title, subtitle, progress, rank, 0, false);
+    }
+
+    /**
+     * @param fitW   card width to use instead of the usual one (height follows), 0 for normal
+     * @param named  show the title under posters too (they normally rely on the artwork)
+     */
+    public static LinearLayout card(Context c, Shape shape, String image, String title, String subtitle, float progress, int rank,
+                                    int fitW, boolean named) {
         int w, h;
         switch (shape) {
             case POSTER: w = Ui.dp(c, 112); h = Ui.dp(c, 168); break;
             case RANKED: w = Ui.dp(c, 104); h = Ui.dp(c, 156); break;
             case CHANNEL: w = Ui.dp(c, 136); h = Ui.dp(c, 78); break;
             default: w = Ui.dp(c, 220); h = Ui.dp(c, 124); break;
+        }
+        if (fitW > 0 && shape != Shape.RANKED) {
+            h = Math.round(h * (fitW / (float) w));
+            w = fitW;
         }
         final LinearLayout card = new LinearLayout(c);
         card.setOrientation(LinearLayout.VERTICAL);
@@ -58,15 +71,14 @@ public final class Cards {
         } else {
             img.setScaleType(ImageView.ScaleType.CENTER_CROP);
         }
+        // Name / initials in place of the picture: shown while it loads, and kept if it can't be loaded
+        TextView ph = Ui.lines(Ui.title(c, shape == Shape.CHANNEL || shape == Shape.LANDSCAPE ? initials(title) : title, shape == Shape.CHANNEL ? 20 : 15), 4);
+        ph.setTextColor(Ui.TEXT3);
+        ph.setGravity(Gravity.CENTER);
+        int pp = Ui.dp(c, 8);
+        ph.setPadding(pp, pp, pp, pp);
+        art.addView(ph, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         art.addView(img, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        if (image == null || image.isEmpty()) {
-            TextView ph = Ui.lines(Ui.title(c, shape == Shape.CHANNEL || shape == Shape.LANDSCAPE ? initials(title) : title, shape == Shape.CHANNEL ? 20 : 15), 4);
-            ph.setTextColor(Ui.TEXT3);
-            ph.setGravity(Gravity.CENTER);
-            int p = Ui.dp(c, 8);
-            ph.setPadding(p, p, p, p);
-            art.addView(ph, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        }
         if (progress > 0) {
             FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(c, 3), Gravity.BOTTOM);
             int m = Ui.dp(c, 8);
@@ -76,7 +88,7 @@ public final class Cards {
         Ui.rippleOver(art, 8);
         art.setClickable(false);
         ImageLoader.load(img, image, shape == Shape.CHANNEL || shape == Shape.LANDSCAPE ? 440 : 240,
-                shape == Shape.CHANNEL || shape == Shape.LANDSCAPE ? 248 : 360);
+                shape == Shape.CHANNEL || shape == Shape.LANDSCAPE ? 248 : 360, ph);
 
         if (shape == Shape.RANKED) {
             FrameLayout ranked = new FrameLayout(c);
@@ -91,7 +103,7 @@ public final class Cards {
         }
         card.setTag(art);
 
-        if (shape != Shape.POSTER && shape != Shape.RANKED) {
+        if (named || (shape != Shape.POSTER && shape != Shape.RANKED)) {
             TextView t = Ui.oneLine(Ui.medium(c, title, 13, Ui.TEXT));
             t.setPadding(Ui.dp(c, 1), Ui.dp(c, 7), 0, 0);
             card.addView(t, new LinearLayout.LayoutParams(w, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -208,7 +220,8 @@ public final class Cards {
         box.addView(h);
         int gap = Ui.dp(c, 8), side = Ui.dp(c, 16);
         int usable = c.getResources().getDisplayMetrics().widthPixels - 2 * side;
-        int cols = Math.max(2, (usable + gap) / (width(c, shape) + gap));
+        int cols = Math.max(2, Math.round((usable + gap) / (float) (width(c, shape) + gap)));
+        int cardW = (usable - (cols - 1) * gap) / cols; // stretch the cards so the grid fills the width evenly
         LinearLayout row = null;
         for (int i = 0; i < items.size(); i++) {
             if (i % cols == 0) {
@@ -219,9 +232,9 @@ public final class Cards {
             }
             final Item it = items.get(i);
             String name = Item.EPISODE.equals(it.type) && it.num != null ? "E" + it.num + " · " + it.name : it.name;
-            LinearLayout card = card(c, shape, it.icon, name, null, 0, 0);
+            LinearLayout card = card(c, shape, it.icon, name, null, 0, 0, cardW, true);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            lp.rightMargin = gap;
+            if (i % cols != cols - 1) lp.rightMargin = gap;
             row.addView(card, lp);
             card.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) { pick.pick(it, v); }
