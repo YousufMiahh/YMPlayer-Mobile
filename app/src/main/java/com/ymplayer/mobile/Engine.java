@@ -57,5 +57,8 @@ public interface Engine {
     /** Frames per second of the video, 0 if unknown, -1 if there's no video. */
     float frameRate();
 
+    /** True if the stream has audio but none of it can be played by this engine (e.g. DTS on the Android player). */
+    boolean audioUnsupported();
+
     void release();
 }

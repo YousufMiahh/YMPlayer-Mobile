@@ -190,4 +190,6 @@ public class VlcEngine implements Engine {
         });
         ops.shutdown();
     }
+
+    public boolean audioUnsupported() { return false; } // VLC decodes the audio itself
 }
