@@ -56,48 +56,68 @@ public class Icon extends View {
         c.translate(getPaddingLeft() + (getWidth() - getPaddingLeft() - getPaddingRight() - size) / 2f,
                 getPaddingTop() + (getHeight() - getPaddingTop() - getPaddingBottom() - size) / 2f);
         c.scale(s, s);
-        stroke.setStrokeWidth(2f);
+        stroke.setStrokeWidth(2.2f); // bold, rounded strokes and solid shapes (the clean TV-app look)
         path.reset();
+        path.setFillType(Path.FillType.WINDING);
         switch (kind) {
-            case HOME:
-                path.moveTo(3, 11); path.lineTo(12, 3.5f); path.lineTo(21, 11);
-                path.moveTo(5.5f, 9.5f); path.lineTo(5.5f, 20); path.lineTo(18.5f, 20); path.lineTo(18.5f, 9.5f);
-                path.moveTo(10, 20); path.lineTo(10, 14.5f); path.lineTo(14, 14.5f); path.lineTo(14, 20);
-                c.drawPath(path, stroke);
+            case HOME: { // solid house with a door cut out
+                path.setFillType(Path.FillType.EVEN_ODD);
+                path.moveTo(12, 3.2f); path.lineTo(21, 10.8f); path.lineTo(19, 10.8f); path.lineTo(19, 20.5f);
+                path.lineTo(5, 20.5f); path.lineTo(5, 10.8f); path.lineTo(3, 10.8f); path.close();
+                path.moveTo(10, 20.5f); path.lineTo(10, 15); path.lineTo(14, 15); path.lineTo(14, 20.5f); path.close();
+                Paint.Style st = fill.getStyle();
+                fill.setStyle(Paint.Style.FILL);
+                c.drawPath(path, fill);
+                stroke.setStrokeWidth(1.2f);
+                Path outline = new Path();
+                outline.moveTo(12, 3.2f); outline.lineTo(21, 10.8f); outline.lineTo(3, 10.8f); outline.close();
+                c.drawPath(outline, stroke); // soften the roof corners
+                fill.setStyle(st);
                 break;
-            case LIVE:
-                r.set(2.5f, 6.5f, 21.5f, 19); c.drawRoundRect(r, 2.5f, 2.5f, stroke);
-                path.moveTo(8, 2.5f); path.lineTo(12, 6.5f); path.lineTo(16, 2.5f);
-                c.drawPath(path, stroke);
+            }
+            case LIVE: // broadcast waves  ((•))
+                c.drawCircle(12, 12, 2, fill);
+                r.set(12 - 5.5f, 12 - 5.5f, 12 + 5.5f, 12 + 5.5f);
+                c.drawArc(r, 140, 80, false, stroke);
+                c.drawArc(r, -40, 80, false, stroke);
+                r.set(12 - 9.5f, 12 - 9.5f, 12 + 9.5f, 12 + 9.5f);
+                c.drawArc(r, 135, 90, false, stroke);
+                c.drawArc(r, -45, 90, false, stroke);
                 break;
-            case MOVIES:
-                r.set(4, 3, 20, 21); c.drawRoundRect(r, 2.5f, 2.5f, stroke);
+            case MOVIES: // film strip
+                r.set(4, 3, 20, 21); c.drawRoundRect(r, 2, 2, stroke);
                 path.moveTo(8, 3); path.lineTo(8, 21); path.moveTo(16, 3); path.lineTo(16, 21);
                 path.moveTo(4, 8); path.lineTo(8, 8); path.moveTo(4, 12); path.lineTo(8, 12); path.moveTo(4, 16); path.lineTo(8, 16);
                 path.moveTo(16, 8); path.lineTo(20, 8); path.moveTo(16, 12); path.lineTo(20, 12); path.moveTo(16, 16); path.lineTo(20, 16);
                 c.drawPath(path, stroke);
                 break;
-            case SERIES:
-                r.set(3, 8, 21, 20.5f); c.drawRoundRect(r, 2.5f, 2.5f, stroke);
-                path.moveTo(5.5f, 4.5f); path.lineTo(18.5f, 4.5f);
-                c.drawPath(path, stroke);
-                path.reset();
-                path.moveTo(10.5f, 11.5f); path.lineTo(15, 14.25f); path.lineTo(10.5f, 17); path.close();
-                c.drawPath(path, fill);
+            case SERIES: // a TV on its stand
+                r.set(2.5f, 4, 21.5f, 17); c.drawRoundRect(r, 2.5f, 2.5f, stroke);
+                c.drawLine(12, 17, 12, 20.3f, stroke);
+                c.drawLine(8, 20.5f, 16, 20.5f, stroke);
                 break;
             case SEARCH:
-                c.drawCircle(10.5f, 10.5f, 6.5f, stroke);
-                c.drawLine(15.5f, 15.5f, 20.5f, 20.5f, stroke);
+                stroke.setStrokeWidth(2.8f);
+                c.drawCircle(10.3f, 10.3f, 6.3f, stroke);
+                c.drawLine(15, 15, 20.5f, 20.5f, stroke);
                 break;
-            case SETTINGS:
-                c.drawCircle(12, 12, 3, stroke);
-                for (int i = 0; i < 8; i++) {
-                    double a = Math.PI / 4 * i;
-                    c.drawLine(12 + (float) Math.cos(a) * 6.8f, 12 + (float) Math.sin(a) * 6.8f,
-                            12 + (float) Math.cos(a) * 9.3f, 12 + (float) Math.sin(a) * 9.3f, stroke);
+            case SETTINGS: { // solid gear with a hole
+                path.setFillType(Path.FillType.EVEN_ODD);
+                int teeth = 8;
+                for (int i = 0; i < teeth * 2; i++) {
+                    double a0 = Math.PI * 2 * i / (teeth * 2) - Math.PI / (teeth * 2);
+                    double a1 = a0 + Math.PI * 2 / (teeth * 2);
+                    float rad = i % 2 == 0 ? 10.2f : 7.6f;
+                    float x0 = 12 + (float) Math.cos(a0) * rad, y0 = 12 + (float) Math.sin(a0) * rad;
+                    float x1 = 12 + (float) Math.cos(a1) * rad, y1 = 12 + (float) Math.sin(a1) * rad;
+                    if (i == 0) path.moveTo(x0, y0); else path.lineTo(x0, y0);
+                    path.lineTo(x1, y1);
                 }
-                c.drawCircle(12, 12, 6.8f, stroke);
+                path.close();
+                path.addCircle(12, 12, 3.2f, Path.Direction.CW);
+                c.drawPath(path, fill);
                 break;
+            }
             case BACK:
                 path.moveTo(15, 4.5f); path.lineTo(7.5f, 12); path.lineTo(15, 19.5f);
                 c.drawPath(path, stroke);

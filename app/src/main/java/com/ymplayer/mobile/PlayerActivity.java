@@ -53,6 +53,14 @@ public class PlayerActivity extends Activity implements Engine.Listener {
     // Controls
     private FrameLayout controls;
     private TextView title, subtitle, timeLeft, timeRight, seekBubbleL, seekBubbleR, dragTime;
+    // Picture preview while dragging along the bar
+    private LinearLayout dragBox;
+    private ImageView dragImage;
+    private FramePreview preview;
+    private int previewFor = -1;
+    // Next episode card
+    private NextUpCard nextCard;
+    private boolean nextShown, nextDismissed;
     private Icon playPause, leftBtn, rightBtn;
     private SeekBarView seek;
     private LinearLayout vodBottom, liveBottom, actions;
@@ -106,6 +114,7 @@ public class PlayerActivity extends Activity implements Engine.Listener {
     private final Runnable ticker = new Runnable() {
         public void run() {
             updateProgress();
+            checkNextCard();
             Async.MAIN.postDelayed(this, 500);
         }
     };
@@ -308,13 +317,23 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         vodBottom.addView(timeRight);
         bottom.addView(vodBottom);
 
-        dragTime = Ui.title(this, "", 30);
+        dragBox = new LinearLayout(this);
+        dragBox.setOrientation(LinearLayout.VERTICAL);
+        dragBox.setGravity(Gravity.CENTER_HORIZONTAL);
+        dragBox.setVisibility(View.GONE);
+        dragImage = new ImageView(this);
+        dragImage.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        dragImage.setBackground(Ui.rounded(this, 0xFF101014, 0x66FFFFFF, 10));
+        dragImage.setClipToOutline(true);
+        int pw = Ui.dp(this, 220);
+        dragBox.addView(dragImage, new LinearLayout.LayoutParams(pw, pw * 9 / 16));
+        dragTime = Ui.title(this, "", 26);
         dragTime.setTextColor(Ui.W1);
         dragTime.setShadowLayer(Ui.dp(this, 8), 0, 0, 0xAA000000);
-        dragTime.setVisibility(View.GONE);
+        dragTime.setPadding(0, Ui.dp(this, 8), 0, 0);
+        dragBox.addView(dragTime);
         FrameLayout.LayoutParams dl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER);
-        root.post(new Runnable() { public void run() {} });
-        controls.addView(dragTime, dl);
+        controls.addView(dragBox, dl);
 
         liveBottom = new LinearLayout(this);
         liveBottom.setGravity(Gravity.CENTER_VERTICAL);
@@ -354,6 +373,20 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         bottom.addView(actions, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         controls.addView(bottom, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM));
         root.addView(controls, match());
+
+        nextCard = new NextUpCard(this);
+        nextCard.setVisibility(View.GONE);
+        FrameLayout.LayoutParams ncl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.END);
+        ncl.rightMargin = Ui.dp(this, 32);
+        ncl.bottomMargin = Ui.dp(this, 72); // above the progress bar
+        root.addView(nextCard, ncl);
+        nextCard.credits.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                nextDismissed = true;
+                hideNextCard();
+            }
+        });
+        nextCard.next.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { playNextEpisode(); } });
     }
 
     private Icon icon(Icon.Kind k, int sizeDp, int padDp) {
@@ -583,7 +616,8 @@ public class PlayerActivity extends Activity implements Engine.Listener {
                 seek.getParent().requestDisallowInterceptTouchEvent(true);
                 seek.setDragging(true);
                 Async.MAIN.removeCallbacks(hideControls);
-                dragTime.setVisibility(View.VISIBLE);
+                startPreview();
+                dragBox.setVisibility(View.VISIBLE);
                 // fall through
             case MotionEvent.ACTION_MOVE:
                 seekTarget = (long) (f * d);
@@ -591,12 +625,14 @@ public class PlayerActivity extends Activity implements Engine.Listener {
                 timeLeft.setText(SeriesActivity.fmt(seekTarget));
                 timeRight.setText("−" + SeriesActivity.fmt(Math.max(0, d - seekTarget)));
                 dragTime.setText(SeriesActivity.fmt(seekTarget));
+                if (preview != null) preview.request(seekTarget);
                 return true;
             case MotionEvent.ACTION_UP:
             case MotionEvent.ACTION_CANCEL:
                 dragging = false;
                 seek.setDragging(false);
-                dragTime.setVisibility(View.GONE);
+                dragBox.setVisibility(View.GONE);
+                if (preview != null) preview.setListener(null);
                 long target = Math.min((long) (f * d), d - 1000);
                 curSeek(Math.max(0, target));
                 seekTarget = -1;
@@ -604,6 +640,78 @@ public class PlayerActivity extends Activity implements Engine.Listener {
                 return true;
         }
         return false;
+    }
+
+    /** The picture above the finger while dragging (not while casting, or if turned off). */
+    private void startPreview() {
+        if (casting || !prefs.scrubPreviews()) {
+            dragImage.setVisibility(View.GONE);
+            return;
+        }
+        if (preview == null || previewFor != index) {
+            releasePreview();
+            preview = new FramePreview(streamUrl(), api.ua, Ui.dp(this, 220));
+            previewFor = index;
+        }
+        dragImage.setImageDrawable(null);
+        dragImage.setVisibility(preview.failed() ? View.GONE : View.VISIBLE);
+        preview.setListener(new FramePreview.Listener() {
+            public void onFrame(long ms, android.graphics.Bitmap b) {
+                if (!dragging) return;
+                if (b != null) dragImage.setImageBitmap(b);
+                else if (preview != null && preview.failed()) dragImage.setVisibility(View.GONE);
+            }
+        });
+    }
+
+    private void releasePreview() {
+        if (preview != null) preview.release();
+        preview = null;
+        previewFor = -1;
+    }
+
+    // ------------------------------------------------------------ next episode
+
+    /** Netflix-style card in the last 30 seconds of an episode that has a next one. */
+    private void checkNextCard() {
+        if (!hasPlayer() || isLive() || inPip || !Item.EPISODE.equals(current().type) || index >= queue.size() - 1) {
+            if (nextShown && inPip) hideNextCard();
+            return;
+        }
+        long d = curDur(), p = curPos();
+        if (d < 5 * 60_000L) return;
+        long left = d - p;
+        if (left > 45_000) nextDismissed = false; // went back: offer it again later
+        if (nextShown) {
+            if (left > 35_000) hideNextCard();
+            else nextCard.setPaused(!curPlaying());
+            return;
+        }
+        if (left <= 30_000 && left > 2_000 && !nextDismissed && !dragging && curPlaying()) {
+            nextShown = true;
+            nextCard.setAlpha(0f);
+            nextCard.setVisibility(View.VISIBLE);
+            nextCard.animate().alpha(1f).setDuration(250).start();
+            nextCard.start(new Runnable() { public void run() { playNextEpisode(); } });
+        }
+    }
+
+    private void hideNextCard() {
+        if (nextCard == null) return;
+        nextCard.stopTimer();
+        if (nextShown) {
+            nextShown = false;
+            nextCard.setVisibility(View.GONE);
+        }
+    }
+
+    private void playNextEpisode() {
+        hideNextCard();
+        if (index >= queue.size() - 1) return;
+        prefs.setPosition(current(), 0);
+        index++;
+        retries = 0;
+        play(false);
     }
 
     // ------------------------------------------------------------ panels
@@ -1016,6 +1124,8 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         Async.MAIN.removeCallbacks(watchdog);
         Async.MAIN.removeCallbacks(zapPlay);
         Cast.listen(this, castChanges, false);
+        releasePreview();
+        hideNextCard();
         savePosition(); // if casting, the TV just carries on
         releaseEngine();
         boolean closedPip = inPip;
@@ -1167,6 +1277,9 @@ public class PlayerActivity extends Activity implements Engine.Listener {
 
     private void play(boolean resume) {
         if (videoHost == null) return;
+        hideNextCard();
+        nextDismissed = false;
+        if (previewFor != index) releasePreview();
         Item it = current();
         long start = 0;
         if (!isLive() && resume) {
@@ -1414,6 +1527,11 @@ public class PlayerActivity extends Activity implements Engine.Listener {
     @Override
     public void onBackPressed() {
         if (Coach.back(this)) return;
+        if (nextShown) { // Back on the card = watch the credits
+            nextDismissed = true;
+            hideNextCard();
+            return;
+        }
         if (videoHost != null && panelOpen()) {
             hidePanels();
             return;
