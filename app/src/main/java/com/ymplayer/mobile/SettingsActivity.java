@@ -250,6 +250,9 @@ public class SettingsActivity extends Activity {
         } catch (Exception ignored) {
         }
         row("Version", "YM Player " + ver, null);
+        row("Check for Updates", "Get the latest version", new Action() {
+            public void run(TextView v) { Updater.check(SettingsActivity.this, true); }
+        });
         TextView credit = Ui.medium(this, "Developed by Yousuf Miah", 13, Ui.TEXT2);
         credit.setGravity(Gravity.CENTER);
         credit.setPadding(0, Ui.dp(this, 22), 0, Ui.dp(this, 10));
