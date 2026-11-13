@@ -104,13 +104,19 @@ public final class Cards {
         card.setTag(art);
 
         if (named || (shape != Shape.POSTER && shape != Shape.RANKED)) {
+            // Top 10: the name sits under the poster, not under the big number
+            int indent = shape == Shape.RANKED ? width(c, shape) - w : 0;
             TextView t = Ui.oneLine(Ui.medium(c, title, 13, Ui.TEXT));
             t.setPadding(Ui.dp(c, 1), Ui.dp(c, 7), 0, 0);
-            card.addView(t, new LinearLayout.LayoutParams(w, ViewGroup.LayoutParams.WRAP_CONTENT));
+            LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(w, ViewGroup.LayoutParams.WRAP_CONTENT);
+            tlp.leftMargin = indent;
+            card.addView(t, tlp);
             if (subtitle != null && !subtitle.isEmpty()) {
                 TextView s = Ui.oneLine(Ui.text(c, subtitle, 12, Ui.TEXT2));
                 s.setPadding(Ui.dp(c, 1), Ui.dp(c, 3), 0, 0);
-                card.addView(s, new LinearLayout.LayoutParams(w, ViewGroup.LayoutParams.WRAP_CONTENT));
+                LinearLayout.LayoutParams slp = new LinearLayout.LayoutParams(w, ViewGroup.LayoutParams.WRAP_CONTENT);
+                slp.leftMargin = indent;
+                card.addView(s, slp);
             }
         }
         // Presses show on the artwork; the whole card is the touch target.
@@ -198,7 +204,8 @@ public final class Cards {
             }
             String name = it.name;
             if (Item.EPISODE.equals(it.type) && it.num != null) name = "E" + it.num + " · " + it.name;
-            LinearLayout card = card(c, shape, img, name, sub, progress, it.rank > 0 ? it.rank : rank);
+            // Every card gets its name underneath: not all artwork has the title on it
+            LinearLayout card = card(c, shape, img, name, sub, progress, it.rank > 0 ? it.rank : rank, 0, true);
             if (prefs != null && prefs.isWatched(it)) markWatched(card);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             lp.rightMargin = Ui.dp(c, shape == Shape.RANKED ? 4 : 8);
