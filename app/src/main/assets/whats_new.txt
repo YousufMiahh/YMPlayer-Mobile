@@ -1,3 +1,4 @@
+- Continue Watching: when you finish an episode, the next one takes its place, ready to start. Episodes started from Continue Watching or the Queue now also play on into the next one.
 - Updates: Update now downloads the new version in your browser. When it's done, tap the file to install it. The app no longer installs updates itself, so Google Play Protect stops warning that it's harmful.
 - Season downloads: no more doubled downloads, and the Downloads tab shows the next episode as soon as it starts.
 - Film page: all the buttons now fit on narrower phones.

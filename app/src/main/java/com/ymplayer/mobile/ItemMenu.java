@@ -45,7 +45,7 @@ final class ItemMenu {
                 public void run() { prefs.setWatched(season, !all); }
             }, changed)));
         }
-        if (!series && !live && prefs.position(it) > 0) {
+        if (!series && !live && (prefs.position(it) > 0 || prefs.isUpNext(it))) {
             o.add(new Sheet.Option("✕  Remove from Continue Watching", false, done(new Runnable() {
                 public void run() { prefs.setPosition(it, 0); }
             }, changed), true));
