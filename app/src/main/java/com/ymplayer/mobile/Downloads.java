@@ -38,6 +38,8 @@ public final class Downloads {
         public int state = QUEUED;
         public long done, total;
         public String reason;
+        /** Bytes per second right now (0 if unknown), and the time left in ms (-1 if unknown). */
+        public long speed, eta = -1;
 
         public float fraction() { return total > 0 ? Math.min(1f, done / (float) total) : 0f; }
     }
@@ -95,6 +97,90 @@ public final class Downloads {
     /** Starts downloading a movie or episode. */
     public static void start(Context c, XtreamApi api, Item it) {
         if (find(c, it) != null) return;
+        Entry e = begin(c, api, it);
+        List<Entry> l = list(c);
+        l.add(0, e);
+        save(c, l);
+    }
+
+    /**
+     * A whole season or series: they wait their turn and download one at a time (in episode
+     * order), so they don't use up your provider's connections. Already-downloaded ones are skipped.
+     * @return how many were added
+     */
+    public static int startAll(Context c, XtreamApi api, List<Item> items) {
+        List<Entry> l = list(c);
+        int added = 0;
+        for (Item it : items) {
+            boolean have = false;
+            for (Entry e : l) if (e.item.key().equals(it.key())) have = true;
+            if (have) continue;
+            Entry e = new Entry();
+            e.item = it;
+            e.id = -1; // waiting its turn
+            e.added = System.currentTimeMillis();
+            l.add(e);
+            added++;
+        }
+        save(c, l);
+        pump(c, api);
+        return added;
+    }
+
+    /** Starts the next waiting download when nothing else is downloading. @return true if one started */
+    public static boolean pump(Context c, XtreamApi api) {
+        List<Entry> l = list(c);
+        List<Entry> started = new ArrayList<>();
+        Entry next = null;
+        for (Entry e : l) {
+            if (e.id >= 0) started.add(e);
+            else if (next == null) next = e;
+        }
+        if (next == null) return false;
+        for (Status s : statuses(c, started).values()) {
+            if (s.state == RUNNING || s.state == QUEUED || s.state == PAUSED) return false; // one at a time
+        }
+        Entry fresh = begin(c, api, next.item);
+        next.id = fresh.id;
+        next.file = fresh.file;
+        save(c, l);
+        return true;
+    }
+
+    public static boolean pump(Context c) { return pump(c, new XtreamApi(new Prefs(c))); }
+
+    /** Android says a download finished (even with the app closed): start the next one waiting. */
+    public static class DoneReceiver extends android.content.BroadcastReceiver {
+        @Override
+        public void onReceive(final Context c, android.content.Intent i) {
+            final PendingResult r = goAsync();
+            new Thread(new Runnable() {
+                public void run() {
+                    try { pump(c.getApplicationContext()); } catch (Exception ignored) { }
+                    r.finish();
+                }
+            }).start();
+        }
+    }
+
+    /** Waiting season / series downloads left. */
+    public static int waiting(Context c) {
+        int n = 0;
+        for (Entry e : list(c)) if (e.id < 0) n++;
+        return n;
+    }
+
+    /** Cancel everything that hasn't finished yet. */
+    public static void cancelUnfinished(Context c) {
+        List<Entry> l = list(c);
+        Map<Long, Status> st = statuses(c, l);
+        for (Entry e : new ArrayList<>(l)) {
+            Status s = st.get(e.id);
+            if (e.id < 0 || s == null || s.state != DONE) remove(c, e.item);
+        }
+    }
+
+    private static Entry begin(Context c, XtreamApi api, Item it) {
         String ext = it.ext == null || it.ext.isEmpty() ? "mp4" : it.ext;
         String name = (it.type + "_" + it.id).replaceAll("[^A-Za-z0-9_]", "_") + "." + ext;
         String url = api.playUrl(it, "ts");
@@ -114,9 +200,7 @@ public final class Downloads {
         e.added = System.currentTimeMillis();
         File dir = c.getExternalFilesDir(Environment.DIRECTORY_MOVIES);
         e.file = dir == null ? null : new File(dir, name).getAbsolutePath();
-        List<Entry> l = list(c);
-        l.add(0, e);
-        save(c, l);
+        return e;
     }
 
     /** Cancels a download or deletes a downloaded file. */
@@ -144,11 +228,13 @@ public final class Downloads {
     public static Map<Long, Status> statuses(Context c, List<Entry> entries) {
         Map<Long, Status> out = new HashMap<>();
         if (entries.isEmpty()) return out;
-        long[] ids = new long[entries.size()];
-        for (int i = 0; i < ids.length; i++) ids[i] = entries.get(i).id;
+        List<Long> real = new ArrayList<>();
+        for (Entry e : entries) if (e.id >= 0) real.add(e.id);
+        long[] ids = new long[real.size()];
+        for (int i = 0; i < ids.length; i++) ids[i] = real.get(i);
         Cursor cur = null;
         try {
-            cur = dm(c).query(new DownloadManager.Query().setFilterById(ids));
+            cur = ids.length == 0 ? null : dm(c).query(new DownloadManager.Query().setFilterById(ids));
             while (cur != null && cur.moveToNext()) {
                 Status s = new Status();
                 long id = cur.getLong(cur.getColumnIndexOrThrow(DownloadManager.COLUMN_ID));
@@ -173,6 +259,7 @@ public final class Downloads {
                         break;
                     default: s.state = QUEUED;
                 }
+                speed(id, s);
                 out.put(id, s);
             }
         } catch (Exception ignored) {
@@ -181,6 +268,7 @@ public final class Downloads {
         }
         // Finished files whose record Android has since forgotten still count as downloaded
         for (Entry e : entries) {
+            if (e.id < 0) continue;
             if (out.containsKey(e.id)) continue;
             Status s = new Status();
             File f = e.file == null ? null : new File(e.file);
@@ -196,7 +284,49 @@ public final class Downloads {
         return out;
     }
 
+    /** Status for a season / series download still waiting its turn. */
+    public static Status waitingStatus() {
+        Status s = new Status();
+        s.state = QUEUED;
+        s.reason = "Waiting its turn";
+        return s;
+    }
+
+    /** Download speed, smoothed, and from it the time left. */
+    private static final Map<Long, long[]> SPEED = new HashMap<>(); // id → {bytes, at ms, bytes per s}
+
+    private static void speed(long id, Status s) {
+        if (s.state != RUNNING) return;
+        long now = System.currentTimeMillis();
+        synchronized (SPEED) {
+            long[] p = SPEED.get(id);
+            if (p == null) {
+                SPEED.put(id, new long[]{s.done, now, 0});
+                return;
+            }
+            long dt = now - p[1];
+            if (dt >= 800 && s.done >= p[0]) {
+                long inst = (s.done - p[0]) * 1000 / dt;
+                p[2] = p[2] == 0 ? inst : (p[2] * 7 + inst * 3) / 10;
+                p[0] = s.done;
+                p[1] = now;
+            }
+            s.speed = p[2];
+            if (p[2] > 0 && s.total > 0) s.eta = (s.total - s.done) * 1000 / p[2];
+        }
+    }
+
+    /** "4 min left", "1 hr 10 min left", "less than a minute left". */
+    public static String timeLeft(long ms) {
+        if (ms < 0) return null;
+        long min = (ms + 59_999) / 60_000;
+        if (min <= 1) return "less than a minute left";
+        if (min < 60) return min + " min left";
+        return (min / 60) + " hr " + (min % 60) + " min left";
+    }
+
     public static Status status(Context c, Entry e) {
+        if (e.id < 0) return waitingStatus();
         List<Entry> one = new ArrayList<>();
         one.add(e);
         return statuses(c, one).get(e.id);

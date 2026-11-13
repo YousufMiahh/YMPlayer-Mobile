@@ -141,6 +141,20 @@ public class MovieActivity extends Activity {
                 public void onClick(View v) { TrailerActivity.open(MovieActivity.this, trailer); }
             }));
         }
+        final boolean queued = prefs.inQueue(movie);
+        actions.addView(DetailUi.action(this, queued ? Icon.Kind.CHECK : Icon.Kind.PLUS, queued ? "In Queue" : "Queue", queued ? Ui.ACCENT : Ui.TEXT, new View.OnClickListener() {
+            public void onClick(View v) {
+                if (queued) prefs.queueRemove(movie); else prefs.queueAdd(movie);
+                buildButtons();
+            }
+        }));
+        final boolean watched = prefs.isWatched(movie);
+        actions.addView(DetailUi.action(this, Icon.Kind.CHECK, watched ? "Watched" : "Mark Watched", watched ? Ui.ACCENT : Ui.TEXT3, new View.OnClickListener() {
+            public void onClick(View v) {
+                prefs.setWatched(movie, !watched);
+                buildButtons();
+            }
+        }));
         if (pos > 0) {
             actions.addView(DetailUi.action(this, Icon.Kind.RESTART, "Start Over", Ui.TEXT, new View.OnClickListener() {
                 public void onClick(View v) { play(true); }
@@ -165,6 +179,7 @@ public class MovieActivity extends Activity {
                 if (isFinishing() || r == null) return;
                 JSONObject info = r.optJSONObject("info");
                 if (info == null) return;
+                if (movie.tmdb == null) movie.tmdb = str(info, "tmdb_id", str(info, "tmdb", null));
                 String p = str(info, "plot", str(info, "description", null));
                 if (p != null) {
                     plot.setText(p);

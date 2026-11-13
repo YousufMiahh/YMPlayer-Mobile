@@ -112,6 +112,7 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         public void run() {
             updateProgress();
             checkNextCard();
+            checkIntro();
             Async.MAIN.postDelayed(this, 500);
         }
     };
@@ -364,6 +365,17 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         controls.addView(bottom, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM));
         root.addView(controls, match());
 
+        skipBtn = Ui.medium(this, "Skip Intro", 15, 0xFF000000);
+        skipBtn.setTypeface(Ui.semibold());
+        skipBtn.setBackground(Ui.rounded(this, 0xF2FFFFFF, 0, 6));
+        skipBtn.setPadding(Ui.dp(this, 20), Ui.dp(this, 11), Ui.dp(this, 20), Ui.dp(this, 11));
+        skipBtn.setVisibility(View.GONE);
+        skipBtn.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { skipIntro(); } });
+        FrameLayout.LayoutParams skl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.END);
+        skl.rightMargin = Ui.dp(this, 32);
+        skl.bottomMargin = Ui.dp(this, 72);
+        root.addView(skipBtn, skl);
+
         nextCard = new NextUpCard(this);
         nextCard.setVisibility(View.GONE);
         FrameLayout.LayoutParams ncl = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.END);
@@ -376,7 +388,7 @@ public class PlayerActivity extends Activity implements Engine.Listener {
                 hideNextCard();
             }
         });
-        nextCard.next.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { playNextEpisode(); } });
+        nextCard.next.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { playNext(); } });
     }
 
     private Icon icon(Icon.Kind k, int sizeDp, int padDp) {
@@ -631,27 +643,46 @@ public class PlayerActivity extends Activity implements Engine.Listener {
 
     // ------------------------------------------------------------ next episode
 
-    /** Netflix-style card in the last 30 seconds of an episode that has a next one. */
+    /** What plays after this: the next episode, or else the next thing in your Queue. */
+    private Item upNext() {
+        Item cur = current();
+        if (Item.EPISODE.equals(cur.type) && index < queue.size() - 1) return queue.get(index + 1);
+        return prefs.queueNextAfter(cur);
+    }
+
+    /** When the card appears: when the credits start (if the intro database knows), else 30 s from the end. */
+    private long cardAt(long d) {
+        long credits = segments != null ? segments.creditsStart : -1;
+        if (credits > 60_000 && credits < d - 5_000) return credits;
+        return d - 30_000;
+    }
+
+    /** Netflix-style card when the credits start (or 30 s from the end) if something plays next. */
     private void checkNextCard() {
-        if (!hasPlayer() || isLive() || inPip || !Item.EPISODE.equals(current().type) || index >= queue.size() - 1) {
+        if (!hasPlayer() || isLive() || inPip) {
             if (nextShown && inPip) hideNextCard();
             return;
         }
         long d = curDur(), p = curPos();
         if (d < 5 * 60_000L) return;
-        long left = d - p;
-        if (left > 45_000) nextDismissed = false; // went back: offer it again later
+        long at = cardAt(d), left = d - p;
+        if (p < at - 15_000) nextDismissed = false; // went back: offer it again later
         if (nextShown) {
-            if (left > 35_000) hideNextCard();
+            if (p < at - 5_000) hideNextCard();
             else nextCard.setPaused(!curPlaying());
             return;
         }
-        if (left <= 30_000 && left > 2_000 && !nextDismissed && !dragging && curPlaying()) {
+        if (p >= at && left > 2_000 && !nextDismissed && !dragging && curPlaying()) {
+            Item nx = upNext();
+            if (nx == null) return;
+            boolean sameSeries = Item.EPISODE.equals(current().type) && Item.EPISODE.equals(nx.type)
+                    && current().parentId != null && current().parentId.equals(nx.parentId);
+            nextCard.next.setLabel(sameSeries ? "Next Episode" : "Next in Queue");
             nextShown = true;
             nextCard.setAlpha(0f);
             nextCard.setVisibility(View.VISIBLE);
             nextCard.animate().alpha(1f).setDuration(250).start();
-            nextCard.start(new Runnable() { public void run() { playNextEpisode(); } });
+            nextCard.start(new Runnable() { public void run() { playNext(); } });
         }
     }
 
@@ -664,13 +695,75 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         }
     }
 
-    private void playNextEpisode() {
+    /** Next episode (in its series' list), or the next item in your Queue (played on its own). */
+    private void playNext() {
+        Item nx = upNext();
         hideNextCard();
-        if (index >= queue.size() - 1) return;
-        prefs.setPosition(current(), 0);
-        index++;
+        if (nx == null) return;
+        prefs.setWatched(current(), true);
+        if (Item.EPISODE.equals(current().type) && index < queue.size() - 1 && queue.get(index + 1) == nx) {
+            index++;
+        } else {
+            queue = new java.util.ArrayList<>(java.util.Collections.singletonList(nx));
+            index = 0;
+        }
         retries = 0;
         play(false);
+    }
+
+    // ------------------------------------------------------------ skip intro
+
+    private Intros.Segments segments;
+    private TextView skipBtn;
+    private boolean skipShown;
+
+    /** Episodes: ask the intro database where this one's intro and credits are. */
+    private void loadSegments() {
+        segments = null;
+        final Item ep = current();
+        if (!Item.EPISODE.equals(ep.type) || ep.season < 0 || ep.parentName == null) return;
+        final int at = index;
+        Async.run(new Async.Work<Intros.Segments>() {
+            public Intros.Segments run() {
+                int n;
+                try { n = Integer.parseInt(ep.num == null ? "" : ep.num.trim()); } catch (Exception e) { return null; }
+                String id = Tmdb.findId(getApplicationContext(), Tmdb.TV, ep.parentName, ep.tmdb);
+                return id == null ? null : Intros.get(id, ep.season, n);
+            }
+        }, new Async.Done<Intros.Segments>() {
+            public void done(Intros.Segments s, Exception e) {
+                if (!isFinishing() && at == index && current() == ep) segments = s;
+            }
+        });
+    }
+
+    /** The "Skip Intro" button shows while the intro is playing. */
+    private void checkIntro() {
+        if (!hasPlayer() || isLive() || inPip || segments == null || !segments.hasIntro() || dragging) {
+            showSkip(false);
+            return;
+        }
+        long p = curPos();
+        showSkip(p >= segments.introStart && p < segments.introEnd - 1500);
+    }
+
+    private void showSkip(boolean on) {
+        if (skipBtn == null || on == skipShown) return;
+        skipShown = on;
+        skipBtn.animate().cancel();
+        if (on) {
+            skipBtn.setAlpha(0f);
+            skipBtn.setVisibility(View.VISIBLE);
+            skipBtn.animate().alpha(1f).setDuration(200).start();
+        } else {
+            skipBtn.setVisibility(View.GONE);
+        }
+    }
+
+    private void skipIntro() {
+        if (segments == null) return;
+        curSeek(segments.introEnd);
+        showSkip(false);
     }
 
     // ------------------------------------------------------------ panels
@@ -1155,12 +1248,9 @@ public class PlayerActivity extends Activity implements Engine.Listener {
             play(false);
             return;
         }
-        prefs.setPosition(current(), 0);
-        if (Item.EPISODE.equals(current().type) && index < queue.size() - 1) {
-            index++;
-            retries = 0;
-            play(false);
-        } else {
+        if (upNext() != null) playNext(); // next episode, or the next thing in your Queue
+        else {
+            prefs.setWatched(current(), true);
             finish();
         }
     }
@@ -1237,6 +1327,7 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         if (videoHost == null) return;
         hideNextCard();
         nextDismissed = false;
+        showSkip(false);
         Item it = current();
         long start = 0;
         if (!isLive() && resume) {
@@ -1260,6 +1351,7 @@ public class PlayerActivity extends Activity implements Engine.Listener {
             load(start);
         }
         prefs.addHistory(it);
+        loadSegments();
         boolean live = isLive();
         vodBottom.setVisibility(live ? View.GONE : View.VISIBLE);
         liveBottom.setVisibility(live ? View.VISIBLE : View.GONE);
@@ -1306,7 +1398,7 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         if (!hasPlayer() || queue == null || isLive()) return;
         long d = curDur(), p = curPos();
         if (d > 0) prefs.setDuration(current(), d);
-        if (d > 0 && p > d - 60000) prefs.setPosition(current(), 0);
+        if (d > 0 && (p > d - 60000 || p >= d * 0.9)) prefs.setWatched(current(), true); // finished (or into the credits)
         else if (p > 10000) prefs.setPosition(current(), p);
     }
 

@@ -25,6 +25,10 @@ public class Item {
     public String parentId, parentName, parentIcon;
     /** Episode running time, kept separately so the resume note can be rebuilt. */
     public String duration;
+    /** For episodes: season number (0 = specials, -1 unknown). */
+    public int season = -1;
+    /** The Movie Database id (of the film, or of the series for episodes), when the provider gives one. */
+    public String tmdb;
     /** Position in a chart such as the Netflix Top 10 (not saved). */
     public int rank;
 
@@ -128,6 +132,8 @@ public class Item {
             o.put("pname", parentName);
             o.put("picon", parentIcon);
             o.put("dur", duration);
+            o.put("season", season);
+            o.put("tmdb", tmdb);
         } catch (Exception ignored) {
         }
         return o;
@@ -146,6 +152,8 @@ public class Item {
         it.parentName = opt(o, "pname");
         it.parentIcon = opt(o, "picon");
         it.duration = opt(o, "dur");
+        it.season = o.optInt("season", -1);
+        it.tmdb = opt(o, "tmdb");
         return it;
     }
 

@@ -108,7 +108,9 @@ class DownloadButton extends LinearLayout {
                 icon.setKind(Icon.Kind.CLOSE);
                 icon.setColor(Ui.TEXT2);
                 int pc = Math.round(ring.progress * 100);
-                label.setText(st == Downloads.PAUSED ? "Waiting…" : pc > 0 ? pc + "%" : "Starting…");
+                String left = s == null ? null : Downloads.timeLeft(s.eta);
+                label.setText(st == Downloads.PAUSED ? "Waiting…" : left != null ? left.replace(" left", "") + " left"
+                        : pc > 0 ? pc + "%" : "Starting…");
                 break;
             default:
                 icon.setKind(Icon.Kind.DOWNLOAD);

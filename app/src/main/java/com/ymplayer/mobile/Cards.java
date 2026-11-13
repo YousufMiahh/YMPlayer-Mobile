@@ -129,6 +129,19 @@ public final class Cards {
         return card;
     }
 
+    /** Small "✓" in the corner of something you've already watched. */
+    static void markWatched(LinearLayout card) {
+        if (!(card.getTag() instanceof FrameLayout)) return;
+        Context c = card.getContext();
+        TextView b = Ui.medium(c, "✓", 12, 0xFF000000);
+        b.setTypeface(Ui.semibold());
+        b.setGravity(Gravity.CENTER);
+        b.setBackground(Ui.rounded(c, 0xF2FFFFFF, 0, 11));
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(Ui.dp(c, 22), Ui.dp(c, 22), Gravity.TOP | Gravity.END);
+        lp.topMargin = lp.rightMargin = Ui.dp(c, 6);
+        ((FrameLayout) card.getTag()).addView(b, lp);
+    }
+
     public static View progressBar(Context c, float progress) {
         LinearLayout bar = new LinearLayout(c);
         bar.setOrientation(LinearLayout.HORIZONTAL);
@@ -186,6 +199,7 @@ public final class Cards {
             String name = it.name;
             if (Item.EPISODE.equals(it.type) && it.num != null) name = "E" + it.num + " · " + it.name;
             LinearLayout card = card(c, shape, img, name, sub, progress, it.rank > 0 ? it.rank : rank);
+            if (prefs != null && prefs.isWatched(it)) markWatched(card);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             lp.rightMargin = Ui.dp(c, shape == Shape.RANKED ? 4 : 8);
             row.addView(card, lp);
@@ -233,6 +247,7 @@ public final class Cards {
             final Item it = items.get(i);
             String name = Item.EPISODE.equals(it.type) && it.num != null ? "E" + it.num + " · " + it.name : it.name;
             LinearLayout card = card(c, shape, it.icon, name, null, 0, 0, cardW, true);
+            if (prefs != null && prefs.isWatched(it)) markWatched(card);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
             if (i % cols != cols - 1) lp.rightMargin = gap;
             row.addView(card, lp);

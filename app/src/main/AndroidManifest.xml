@@ -52,5 +52,11 @@
             android:resizeableActivity="true"
             android:theme="@style/PlayerTheme" />
         <receiver android:name=".Updater$UpdateReceiver" android:exported="false" />
+        <!-- Season / series downloads: start the next episode when one finishes -->
+        <receiver android:name=".Downloads$DoneReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

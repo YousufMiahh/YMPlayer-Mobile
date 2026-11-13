@@ -86,24 +86,8 @@ abstract class Page {
     }
 
     void toggleFavMenu(final Item it) {
-        if (Item.EPISODE.equals(it.type)) return;
-        java.util.List<Sheet.Option> o = new java.util.ArrayList<>();
-        final boolean fav = prefs.isFav(it);
-        o.add(new Sheet.Option(fav ? "Remove from Favourites" : "Add to Favourites", false, new Runnable() {
-            public void run() {
-                Open.toggleFav(a, prefs, it);
-                a.favouritesChanged();
-            }
-        }, fav));
-        if (Item.LIVE.equals(it.type)) {
-            o.add(new Sheet.Option("Play", false, new Runnable() {
-                public void run() { Open.item(a, it, null); }
-            }));
-        } else {
-            o.add(new Sheet.Option("More info", false, new Runnable() {
-                public void run() { Open.item(a, it, null); }
-            }));
-        }
-        Sheet.show(a, it.name, null, o, 0);
+        ItemMenu.show(a, prefs, it, null, new Runnable() {
+            public void run() { a.favouritesChanged(); }
+        });
     }
 }

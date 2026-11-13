@@ -100,6 +100,11 @@ public class SeriesActivity extends Activity {
         seasonBar.setPadding(side, Ui.dp(this, 22), side, Ui.dp(this, 6));
         seasonRow = seasonBar;
         page.addView(seasonBar);
+        // Season download progress: "Season 2: 3 of 10 downloaded · about 38 min left"
+        dlLine = Ui.text(this, "", 12.5f, Ui.TEXT2);
+        dlLine.setPadding(side, 0, side, Ui.dp(this, 6));
+        dlLine.setVisibility(View.GONE);
+        page.addView(dlLine);
         episodeRow = new LinearLayout(this);
         episodeRow.setOrientation(LinearLayout.VERTICAL);
         page.addView(episodeRow);
@@ -207,6 +212,7 @@ public class SeriesActivity extends Activity {
     private void parse(JSONObject r) {
         JSONObject info = r.optJSONObject("info");
         if (info != null) {
+            seriesTmdb = MovieActivity.str(info, "tmdb", MovieActivity.str(info, "tmdb_id", null));
             String p = MovieActivity.str(info, "plot", null);
             if (p != null) {
                 series.plot = p;
@@ -265,7 +271,62 @@ public class SeriesActivity extends Activity {
 
     private static String seasonName(int k) { return k == 0 ? "Specials" : "Season " + k; }
 
-    private TextView seasonPicker;
+    private TextView seasonPicker, dlLine;
+    private String seriesTmdb;
+
+    private final Runnable dlTick = new Runnable() {
+        public void run() {
+            if (updateDownloadLine()) Async.MAIN.postDelayed(this, 1500);
+        }
+    };
+
+    /** Overall progress of this season's downloads. @return true while some are still going */
+    private boolean updateDownloadLine() {
+        List<Item> eps = seasons.get(activeSeason);
+        if (eps == null || dlLine == null) return false;
+        List<Downloads.Entry> mine = new ArrayList<>();
+        for (Item ep : eps) {
+            Downloads.Entry e = Downloads.find(this, ep);
+            if (e != null) mine.add(e);
+        }
+        if (mine.isEmpty()) {
+            dlLine.setVisibility(View.GONE);
+            return false;
+        }
+        java.util.Map<Long, Downloads.Status> st = Downloads.statuses(this, mine);
+        int done = 0, waiting = 0, running = 0;
+        long remaining = 0, speed = 0, doneBytes = 0;
+        for (Downloads.Entry e : mine) {
+            Downloads.Status s = e.id < 0 ? null : st.get(e.id);
+            if (s == null) { waiting++; continue; }
+            if (s.state == Downloads.DONE) { done++; doneBytes += s.total; continue; }
+            if (s.state == Downloads.FAILED) continue;
+            running++;
+            if (s.total > 0) remaining += s.total - s.done;
+            speed += s.speed;
+        }
+        boolean active = running + waiting > 0;
+        if (!active && done == 0) {
+            dlLine.setVisibility(View.GONE);
+            return false;
+        }
+        if (waiting > 0 && done > 0) remaining += waiting * (doneBytes / done); // guess the rest from the ones done
+        String left = speed > 0 && remaining > 0 && (waiting == 0 || done > 0) ? Downloads.timeLeft(remaining * 1000 / speed) : null;
+        dlLine.setText(seasonName(activeSeason) + ":  " + done + " of " + mine.size() + " downloaded"
+                + (active ? (left != null ? "  ·  about " + left : "  ·  downloading…") : ""));
+        dlLine.setVisibility(View.VISIBLE);
+        if (active && waiting > 0) Downloads.pump(this, api);
+        return active;
+    }
+
+    private void downloadSeason(List<Item> eps, String what) {
+        int n = Downloads.startAll(this, api, eps);
+        android.widget.Toast.makeText(this, n == 0 ? what + " is already downloading or downloaded"
+                : "Downloading " + n + (n == 1 ? " episode" : " episodes") + " one at a time", android.widget.Toast.LENGTH_SHORT).show();
+        buildEpisodes();
+        Async.MAIN.removeCallbacks(dlTick);
+        Async.MAIN.post(dlTick);
+    }
 
     private void buildSeasonBar() {
         seasonRow.removeAllViews();
@@ -290,10 +351,37 @@ public class SeriesActivity extends Activity {
             });
             seasonRow.addView(seasonPicker);
         }
-        List<Item> eps = seasons.get(activeSeason);
-        TextView n = Ui.text(this, eps == null ? "" : eps.size() + (eps.size() == 1 ? " episode" : " episodes"), 13, Ui.TEXT3);
+        final List<Item> eps = seasons.get(activeSeason);
+        int seen = eps == null ? 0 : prefs.watchedCount(eps);
+        String count = eps == null ? "" : eps.size() + (eps.size() == 1 ? " episode" : " episodes")
+                + (seen == 0 ? "" : seen == eps.size() ? "  ·  ✓ watched" : "  ·  " + seen + " watched");
+        TextView n = Ui.text(this, count, 13, Ui.TEXT3);
         n.setGravity(Gravity.END);
         seasonRow.addView(n, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        if (eps != null && !eps.isEmpty()) {
+            Icon dl = new Icon(this, Icon.Kind.DOWNLOAD, Ui.TEXT);
+            int dp = Ui.dp(this, 9);
+            dl.setPadding(dp, dp, dp, dp);
+            Ui.ripple(dl, null, 20);
+            dl.setContentDescription("Download season");
+            dl.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    List<Sheet.Option> o = new ArrayList<>();
+                    o.add(new Sheet.Option("Download " + seasonName(activeSeason) + "  ·  " + eps.size() + " episodes", false, new Runnable() {
+                        public void run() { downloadSeason(eps, seasonName(activeSeason)); }
+                    }));
+                    if (seasons.size() > 1) {
+                        final List<Item> all = new ArrayList<>();
+                        for (List<Item> l : seasons.values()) all.addAll(l);
+                        o.add(new Sheet.Option("Download All Seasons  ·  " + all.size() + " episodes", false, new Runnable() {
+                            public void run() { downloadSeason(all, "The whole series"); }
+                        }));
+                    }
+                    Sheet.show(SeriesActivity.this, "Download", "Episodes download one at a time, in order", o, 0);
+                }
+            });
+            seasonRow.addView(dl, new LinearLayout.LayoutParams(Ui.dp(this, 40), Ui.dp(this, 40)));
+        }
     }
 
     private void addEpisodes(JSONArray arr, int fallbackSeason) {
@@ -311,6 +399,8 @@ public class SeriesActivity extends Activity {
             it.parentId = series.id;
             it.parentName = series.name;
             it.parentIcon = series.icon;
+            it.season = season;
+            it.tmdb = seriesTmdb;
             JSONObject ei = e.optJSONObject("info");
             if (ei != null) {
                 String d = MovieActivity.str(ei, "duration", null);
@@ -334,6 +424,8 @@ public class SeriesActivity extends Activity {
         activeSeason = key;
         buildSeasonBar();
         buildEpisodes();
+        Async.MAIN.removeCallbacks(dlTick);
+        Async.MAIN.post(dlTick);
         if (changed) {
             episodeRow.setAlpha(0f);
             episodeRow.setTranslationY(Ui.dp(this, 16));
@@ -350,7 +442,9 @@ public class SeriesActivity extends Activity {
         int side = Ui.dp(this, 16);
         for (final Item ep : eps) {
             long pos = prefs.position(ep), dur = prefs.duration(ep);
-            String sub = pos > 0 && dur > 0 ? fmt(Math.max(0, dur - pos)) + " left" : ep.duration;
+            boolean watched = prefs.isWatched(ep);
+            String sub = watched ? XtreamApi.joinNonEmpty("✓ Watched", ep.duration)
+                    : pos > 0 && dur > 0 ? fmt(Math.max(0, dur - pos)) + " left" : ep.duration;
             String img = ep.icon != null ? ep.icon : series.icon;
 
             LinearLayout row = new LinearLayout(this);
@@ -398,6 +492,19 @@ public class SeriesActivity extends Activity {
             row.setOnClickListener(new View.OnClickListener() {
                 public void onClick(View v) { Open.play(SeriesActivity.this, eps, eps.indexOf(ep)); }
             });
+            row.setOnLongClickListener(new View.OnLongClickListener() {
+                public boolean onLongClick(View v) {
+                    v.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+                    ItemMenu.show(SeriesActivity.this, prefs, ep, eps, new Runnable() {
+                        public void run() {
+                            buildSeasonBar();
+                            buildEpisodes();
+                            buildButtons();
+                        }
+                    });
+                    return true;
+                }
+            });
             episodeRow.addView(row, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         }
     }
@@ -420,8 +527,17 @@ public class SeriesActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (!seasons.isEmpty()) {
+            buildSeasonBar();
             buildEpisodes();
             buildButtons();
+            Async.MAIN.removeCallbacks(dlTick);
+            Async.MAIN.post(dlTick);
         }
+    }
+
+    @Override
+    protected void onPause() {
+        Async.MAIN.removeCallbacks(dlTick);
+        super.onPause();
     }
 }

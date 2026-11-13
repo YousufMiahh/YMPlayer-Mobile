@@ -115,12 +115,20 @@ class DownloadsPage extends Page {
         boolean active = false;
         long used = 0;
         for (Row r : rows) {
-            Downloads.Status s = st.get(r.entry.id);
+            Downloads.Status s = r.entry.id < 0 ? Downloads.waitingStatus() : st.get(r.entry.id);
             if (s == null) continue;
             if (s.state == Downloads.DONE) used += s.total;
             else used += s.done;
             if (s.state == Downloads.RUNNING || s.state == Downloads.QUEUED || s.state == Downloads.PAUSED) active = true;
             paint(r, s);
+        }
+        if (active && Downloads.waiting(a) > 0) { // a season / series download: start the next when one finishes
+            final android.content.Context app = a.getApplicationContext();
+            Async.run(new Async.Work<Boolean>() {
+                public Boolean run() { return Downloads.pump(app); }
+            }, new Async.Done<Boolean>() {
+                public void done(Boolean started, Exception e) { if (Boolean.TRUE.equals(started) && !a.isFinishing()) rebuild(); }
+            });
         }
         long free = Downloads.freeSpace(a);
         int n = rows.size();
@@ -207,7 +215,8 @@ class DownloadsPage extends Page {
                 r.icon.setKind(Icon.Kind.PLAY);
                 break;
             case Downloads.RUNNING:
-                r.status.setText(Math.round(s.fraction() * 100) + "%  ·  " + sizes);
+                String left = Downloads.timeLeft(s.eta);
+                r.status.setText(Math.round(s.fraction() * 100) + "%  ·  " + sizes + (left == null ? "" : "  ·  " + left));
                 r.status.setTextColor(Ui.TEXT2);
                 r.bar.setVisibility(View.VISIBLE);
                 r.icon.setKind(Icon.Kind.CLOSE);
@@ -225,7 +234,7 @@ class DownloadsPage extends Page {
                 r.icon.setKind(Icon.Kind.RESTART);
                 break;
             default:
-                r.status.setText("Waiting to start…");
+                r.status.setText(s.reason != null ? s.reason + "…" : "Waiting to start…");
                 r.status.setTextColor(Ui.TEXT2);
                 r.bar.setVisibility(View.VISIBLE);
                 r.icon.setKind(Icon.Kind.CLOSE);

@@ -694,7 +694,7 @@ class BrowsePage extends Page {
             h = (PosterHolder) v.getTag();
         }
         Item it = shown.get(i);
-        h.title.setText(it.name);
+        h.title.setText(prefs.isWatched(it) ? "✓  " + it.name : it.name); // ✓ = already watched
         h.placeholder.setText(it.name); // shows until (or if) the poster loads
         h.heart.setVisibility(prefs.isFav(it) ? View.VISIBLE : View.GONE);
         ImageLoader.load(h.img, it.icon, 240, 360);

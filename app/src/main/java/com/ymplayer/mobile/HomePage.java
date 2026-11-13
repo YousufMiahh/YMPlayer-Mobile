@@ -47,6 +47,8 @@ class HomePage extends Page {
     private LinearLayout localRows, remoteRows;
     private TextView empty;
     private List<Item> newMovies, newSeries, topMovies, topSeries;
+    private List<Recs.Row> recRows;
+    private String recSig = "";
     private String topSig = "";
     private static final long TOP10_EVERY = 60 * 60_000L;
     private final Runnable top10Tick = new Runnable() {
@@ -130,6 +132,7 @@ class HomePage extends Page {
         paintCast();
         Async.MAIN.removeCallbacks(top10Tick);
         Async.MAIN.post(top10Tick); // check now (cheap if not due), then hourly while the app is open
+        loadRecs(); // "Because you watched…" (cached for a few hours)
     }
 
     @Override
@@ -163,36 +166,12 @@ class HomePage extends Page {
         public void menu(Item it, View card) { toggleFavMenu(it); }
     };
 
-    /** Hold a Continue Watching card: remove it from the list (or jump to its series). */
+    /** Hold a Continue Watching or Queue card: Queue, Watched, Remove… */
     private final Cards.OnMenu continueMenu = new Cards.OnMenu() {
         public void menu(final Item it, View card) {
-            List<Sheet.Option> o = new ArrayList<>();
-            o.add(new Sheet.Option("Remove from Continue Watching", false, new Runnable() {
-                public void run() {
-                    prefs.setPosition(it, 0); // no resume point = off the list
-                    buildLocalRows();
-                }
-            }, true));
-            if (Item.EPISODE.equals(it.type) && it.parentId != null) {
-                o.add(new Sheet.Option("Go to series", false, new Runnable() {
-                    public void run() {
-                        Item s = new Item(Item.SERIES, it.parentId, it.parentName == null ? "" : it.parentName);
-                        s.icon = it.parentIcon;
-                        Open.item(a, s, null);
-                    }
-                }));
-            } else {
-                o.add(new Sheet.Option("Play from the beginning", false, new Runnable() {
-                    public void run() {
-                        prefs.setPosition(it, 0);
-                        List<Item> q = new ArrayList<>();
-                        q.add(it);
-                        Open.play(a, q, 0);
-                    }
-                }));
-            }
-            String name = Item.EPISODE.equals(it.type) && it.parentName != null ? it.parentName + " · " + it.name : it.name;
-            Sheet.show(a, name, null, o, 0);
+            ItemMenu.show(a, prefs, it, null, new Runnable() {
+                public void run() { buildLocalRows(); }
+            });
         }
     };
 
@@ -200,7 +179,12 @@ class HomePage extends Page {
         localRows.removeAllViews();
         List<Item> cw = prefs.homeShows("continue") ? prefs.continueWatching() : new ArrayList<Item>();
         if (!cw.isEmpty()) {
-            localRows.addView(Cards.shelf(a, Cards.titleWithHint("Continue Watching", "Hold to remove"), cw,
+            localRows.addView(Cards.shelf(a, Cards.titleWithHint("Continue Watching", "Hold for options"), cw,
+                    Cards.Shape.LANDSCAPE, prefs, pick, continueMenu));
+        }
+        List<Item> q = prefs.queue();
+        if (!q.isEmpty()) {
+            localRows.addView(Cards.shelf(a, Cards.titleWithHint("Your Queue", "Hold to remove"), q,
                     Cards.Shape.LANDSCAPE, prefs, pick, continueMenu));
         }
         if (prefs.homeShows("recent")) add(localRows, "Recent Channels", limit(prefs.history(true), 20), Cards.Shape.CHANNEL);
@@ -214,6 +198,7 @@ class HomePage extends Page {
         remoteRows.removeAllViews();
         if (prefs.homeShows("top_movies")) add(remoteRows, "Top 10 Movies in the UK", topMovies, Cards.Shape.RANKED);
         if (prefs.homeShows("top_series")) add(remoteRows, "Top 10 Series in the UK", topSeries, Cards.Shape.RANKED);
+        if (recRows != null && prefs.homeShows("recommended")) for (Recs.Row r : recRows) add(remoteRows, r.title, r.items, Cards.Shape.POSTER);
         if (newMovies != null && prefs.homeShows("new_movies")) add(remoteRows, "Recently Added Movies", newMovies, Cards.Shape.POSTER);
         if (newSeries != null && prefs.homeShows("new_series")) add(remoteRows, "Recently Added Series", newSeries, Cards.Shape.POSTER);
         updateEmpty();
@@ -245,6 +230,7 @@ class HomePage extends Page {
                 if (!a.isFinishing()) {
                     loadNewArrivals();
                     loadTop10();
+                    loadRecs();
                 }
             }
         };
@@ -321,6 +307,24 @@ class HomePage extends Page {
                 topSig = sig;
                 topMovies = r[0];
                 topSeries = r[1];
+                buildRemoteRows();
+            }
+        });
+    }
+
+    /** "Because you watched …" rows (TMDB recommendations that your provider has). */
+    private void loadRecs() {
+        if (!prefs.homeShows("recommended")) return;
+        Async.runOn(Top10.WORKER, new Async.Work<List<Recs.Row>>() {
+            public List<Recs.Row> run() throws Exception { return Recs.rows(a.getApplicationContext(), api, prefs); }
+        }, new Async.Done<List<Recs.Row>>() {
+            public void done(List<Recs.Row> r, Exception e) {
+                if (a.isFinishing() || r == null) return;
+                StringBuilder b = new StringBuilder();
+                for (Recs.Row row : r) b.append(row.title).append(sig(row.items));
+                if (b.toString().equals(recSig)) return;
+                recSig = b.toString();
+                recRows = r;
                 buildRemoteRows();
             }
         });
