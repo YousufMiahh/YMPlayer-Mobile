@@ -109,6 +109,14 @@ class DownloadsPage extends Page {
 
     /** @return true while something is still downloading (so we check again soon). */
     private boolean refreshStatus() {
+        // The next episode of a season may have started in the background: show it as downloading
+        List<Downloads.Entry> now = Downloads.list(a);
+        boolean same = now.size() == rows.size();
+        for (int i = 0; same && i < now.size(); i++) same = now.get(i).id == rows.get(i).entry.id;
+        if (!same) {
+            rebuild();
+            return true;
+        }
         List<Downloads.Entry> entries = new ArrayList<>();
         for (Row r : rows) entries.add(r.entry);
         Map<Long, Downloads.Status> st = Downloads.statuses(a, entries);
@@ -122,7 +130,8 @@ class DownloadsPage extends Page {
             if (s.state == Downloads.RUNNING || s.state == Downloads.QUEUED || s.state == Downloads.PAUSED) active = true;
             paint(r, s);
         }
-        if (active && Downloads.waiting(a) > 0) { // a season / series download: start the next when one finishes
+        int waiting = Downloads.waiting(a);
+        if (!active && waiting > 0) { // a season / series download: start the next when one finishes
             final android.content.Context app = a.getApplicationContext();
             Async.run(new Async.Work<Boolean>() {
                 public Boolean run() { return Downloads.pump(app); }
@@ -135,7 +144,7 @@ class DownloadsPage extends Page {
         summary.setText(n == 0 ? "" : n + (n == 1 ? " download" : " downloads") + "  ·  " + Downloads.size(used) + " used"
                 + (free >= 0 ? "  ·  " + Downloads.size(free) + " free" : ""));
         summary.setVisibility(n == 0 ? View.GONE : View.VISIBLE);
-        return active;
+        return active || waiting > 0;
     }
 
     private Row row(final Downloads.Entry e) {

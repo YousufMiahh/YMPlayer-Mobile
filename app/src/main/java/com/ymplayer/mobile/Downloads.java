@@ -95,7 +95,7 @@ public final class Downloads {
     }
 
     /** Starts downloading a movie or episode. */
-    public static void start(Context c, XtreamApi api, Item it) {
+    public static synchronized void start(Context c, XtreamApi api, Item it) {
         if (find(c, it) != null) return;
         Entry e = begin(c, api, it);
         List<Entry> l = list(c);
@@ -108,7 +108,7 @@ public final class Downloads {
      * order), so they don't use up your provider's connections. Already-downloaded ones are skipped.
      * @return how many were added
      */
-    public static int startAll(Context c, XtreamApi api, List<Item> items) {
+    public static synchronized int startAll(Context c, XtreamApi api, List<Item> items) {
         List<Entry> l = list(c);
         int added = 0;
         for (Item it : items) {
@@ -128,7 +128,7 @@ public final class Downloads {
     }
 
     /** Starts the next waiting download when nothing else is downloading. @return true if one started */
-    public static boolean pump(Context c, XtreamApi api) {
+    public static synchronized boolean pump(Context c, XtreamApi api) {
         List<Entry> l = list(c);
         List<Entry> started = new ArrayList<>();
         Entry next = null;
@@ -204,7 +204,7 @@ public final class Downloads {
     }
 
     /** Cancels a download or deletes a downloaded file. */
-    public static void remove(Context c, Item it) {
+    public static synchronized void remove(Context c, Item it) {
         List<Entry> l = list(c);
         for (int i = l.size() - 1; i >= 0; i--) {
             Entry e = l.get(i);
@@ -219,9 +219,9 @@ public final class Downloads {
         save(c, l);
     }
 
-    public static void retry(Context c, XtreamApi api, Item it) {
+    public static synchronized void retry(Context c, XtreamApi api, Item it) {
         remove(c, it);
-        start(c, api, it);
+        startAll(c, api, java.util.Collections.singletonList(it)); // waits its turn if another is downloading
     }
 
     /** Progress for several downloads in one go. */

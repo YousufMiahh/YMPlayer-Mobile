@@ -149,7 +149,7 @@ public class MovieActivity extends Activity {
             }
         }));
         final boolean watched = prefs.isWatched(movie);
-        actions.addView(DetailUi.action(this, Icon.Kind.CHECK, watched ? "Watched" : "Mark Watched", watched ? Ui.ACCENT : Ui.TEXT3, new View.OnClickListener() {
+        actions.addView(DetailUi.action(this, Icon.Kind.CHECK, "Watched", watched ? Ui.ACCENT : Ui.TEXT3, new View.OnClickListener() {
             public void onClick(View v) {
                 prefs.setWatched(movie, !watched);
                 buildButtons();
@@ -160,7 +160,11 @@ public class MovieActivity extends Activity {
                 public void onClick(View v) { play(true); }
             }));
         }
-        buttons.addView(actions);
+        // Share the width so every button fits, even with six of them on a narrow phone
+        for (int i = 0; i < actions.getChildCount(); i++) {
+            actions.getChildAt(i).setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        }
+        buttons.addView(actions, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
     }
 
     private void play(boolean fromStart) {
@@ -237,5 +241,11 @@ public class MovieActivity extends Activity {
     protected void onResume() {
         super.onResume();
         if (buttons != null && buttons.getChildCount() > 0) buildButtons();
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (Sheet.dismiss(this)) return; // close the open menu first
+        super.onBackPressed();
     }
 }

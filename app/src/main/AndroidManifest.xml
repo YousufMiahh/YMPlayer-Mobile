@@ -3,7 +3,6 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!-- Installing updates from the GitHub releases (Android always asks you to confirm) -->
 
     <queries>
         <package android:name="com.google.android.youtube" />
@@ -51,7 +50,8 @@
             android:resizeableActivity="true"
             android:theme="@style/PlayerTheme" />
         <!-- Season / series downloads: start the next episode when one finishes -->
-        <receiver android:name=".Downloads$DoneReceiver" android:exported="true">
+        <receiver android:name=".Downloads$DoneReceiver" android:exported="true"
+            android:permission="android.permission.SEND_DOWNLOAD_COMPLETED_INTENTS">
             <intent-filter>
                 <action android:name="android.intent.action.DOWNLOAD_COMPLETE" />
             </intent-filter>

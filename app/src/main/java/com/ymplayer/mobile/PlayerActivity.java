@@ -93,6 +93,8 @@ public class PlayerActivity extends Activity implements Engine.Listener {
     private int retries;
     private boolean triedAltFormat, triedOtherEngine;
     private boolean firstStart = true, dragging;
+    private long resumeMs;     // where you were when the app went into the background
+    private int endRetries;    // stream ended early: reconnect attempts for this item
     private long seekTarget = -1, burst;
     private int burstSide;
     private int lastRendered = -1, stallTicks, recoveries;
@@ -653,7 +655,7 @@ public class PlayerActivity extends Activity implements Engine.Listener {
     /** When the card appears: when the credits start (if the intro database knows), else 30 s from the end. */
     private long cardAt(long d) {
         long credits = segments != null ? segments.creditsStart : -1;
-        if (credits > 60_000 && credits < d - 5_000) return credits;
+        if (credits > 60_000 && credits > d * 0.7 && credits < d - 5_000) return credits;
         return d - 30_000;
     }
 
@@ -1178,6 +1180,7 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         Cast.listen(this, castChanges, false);
         hideNextCard();
         savePosition(); // if casting, the TV just carries on
+        if (!casting && engine != null && queue != null && !isLive()) resumeMs = engine.position();
         releaseEngine();
         boolean closedPip = inPip;
         super.onStop();
@@ -1246,6 +1249,19 @@ public class PlayerActivity extends Activity implements Engine.Listener {
     public void onEnded() {
         if (isLive()) {
             play(false);
+            return;
+        }
+        // Ended well before the end: the connection dropped, it didn't finish. Pick up where it stopped.
+        long d = curDur(), p = curPos();
+        if (d > 0 && p > 0 && p < d * 0.9 && p < d - 60_000) {
+            if (endRetries++ < 3) {
+                status("Reconnecting…");
+                load(p);
+            } else {
+                savePosition();
+                status("The stream stopped — your place is saved");
+                Async.MAIN.postDelayed(new Runnable() { public void run() { if (!isFinishing()) finish(); } }, 2500);
+            }
             return;
         }
         if (upNext() != null) playNext(); // next episode, or the next thing in your Queue
@@ -1330,8 +1346,11 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         showSkip(false);
         Item it = current();
         long start = 0;
+        long back = resumeMs;
+        resumeMs = 0;
+        if (!resume) endRetries = 0;
         if (!isLive() && resume) {
-            long pos = prefs.position(it);
+            long pos = back > 10000 ? back : prefs.position(it);
             if (pos > 10000) {
                 start = pos;
                 if (firstStart) Toast.makeText(this, "Resuming from " + SeriesActivity.fmt(pos), Toast.LENGTH_SHORT).show();

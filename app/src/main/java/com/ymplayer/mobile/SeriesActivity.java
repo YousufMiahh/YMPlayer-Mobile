@@ -274,8 +274,11 @@ public class SeriesActivity extends Activity {
     private TextView seasonPicker, dlLine;
     private String seriesTmdb;
 
+    private boolean paused;
+
     private final Runnable dlTick = new Runnable() {
         public void run() {
+            if (paused || isFinishing()) return; // not on screen: don't keep checking
             if (updateDownloadLine()) Async.MAIN.postDelayed(this, 1500);
         }
     };
@@ -391,11 +394,11 @@ public class SeriesActivity extends Activity {
             if (e == null) continue;
             int season = e.has("season") ? e.optInt("season", fallbackSeason) : fallbackSeason;
             Item it = new Item(Item.EPISODE, e.optString("id"), "");
-            String num = e.optString("episode_num", String.valueOf(i + 1));
+            String num = MovieActivity.str(e, "episode_num", String.valueOf(i + 1));
             String t = MovieActivity.str(e, "title", series.name);
             it.num = num;
             it.name = t;
-            it.ext = e.optString("container_extension", "mp4");
+            it.ext = MovieActivity.str(e, "container_extension", "mp4");
             it.parentId = series.id;
             it.parentName = series.name;
             it.parentIcon = series.icon;
@@ -526,6 +529,7 @@ public class SeriesActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        paused = false;
         if (!seasons.isEmpty()) {
             buildSeasonBar();
             buildEpisodes();
@@ -537,7 +541,14 @@ public class SeriesActivity extends Activity {
 
     @Override
     protected void onPause() {
+        paused = true;
         Async.MAIN.removeCallbacks(dlTick);
         super.onPause();
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (Sheet.dismiss(this)) return; // close the open menu first
+        super.onBackPressed();
     }
 }

@@ -1,1 +1,6 @@
 - Updates: Update now downloads the new version in your browser. When it's done, tap the file to install it. The app no longer installs updates itself, so Google Play Protect stops warning that it's harmful.
+- Season downloads: no more doubled downloads, and the Downloads tab shows the next episode as soon as it starts.
+- Film page: all the buttons now fit on narrower phones.
+- Back closes an open menu first, instead of leaving the page.
+- If a stream drops part-way through, it reconnects and carries on, instead of marking it watched and moving on.
+- Better matching for Skip Intro and "Because you watched", so titles like "CSI: Miami" or "1917" are found correctly.
