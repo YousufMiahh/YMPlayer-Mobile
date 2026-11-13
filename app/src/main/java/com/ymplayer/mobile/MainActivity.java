@@ -74,7 +74,7 @@ public class MainActivity extends Activity {
         }, 1500);
         Async.MAIN.postDelayed(new Runnable() { // new version on GitHub? (not over the tutorial)
             public void run() {
-                if (!isFinishing() && !Coach.showing(MainActivity.this)) Updater.check(MainActivity.this, false);
+                if (!isFinishing() && !Coach.showing(MainActivity.this) && !WhatsNew.maybeShow(MainActivity.this)) Updater.check(MainActivity.this, false);
             }
         }, 3000);
     }
