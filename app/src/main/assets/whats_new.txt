@@ -1,3 +1,4 @@
+- Sharper icons along the bottom: the ones you're not on are no longer fuzzy.
 - Categories: press and hold a category in the category list to favourite, rename or hide it.
 - Picture: a new Picture button in the player lets you choose Fit, Fill screen, Stretch, 16:9 or 4:3. It's remembered for each channel, film and series.
 - Pinch to zoom: pinch out on the video to fill the screen, pinch in to see the whole picture.

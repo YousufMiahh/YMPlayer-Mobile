@@ -40,10 +40,18 @@ public class Icon extends View {
 
     public Kind kind() { return kind; }
 
+    /**
+     * A see-through colour (e.g. the grey of an unselected tab) is drawn solid and the whole icon
+     * faded instead: drawing each stroke see-through doubles up where strokes overlap and leaves
+     * soft, blotchy edges, so dim icons looked fuzzy.
+     */
     public void setColor(int color) {
-        stroke.setColor(color);
-        fill.setColor(color);
-        text.setColor(color);
+        int a = color >>> 24;
+        int solid = color | 0xFF000000;
+        stroke.setColor(solid);
+        fill.setColor(solid);
+        text.setColor(solid);
+        setAlpha(a / 255f);
         invalidate();
     }
 

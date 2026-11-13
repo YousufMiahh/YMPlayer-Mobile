@@ -122,10 +122,10 @@ public class MainActivity extends Activity {
             t.setOrientation(LinearLayout.VERTICAL);
             t.setGravity(Gravity.CENTER_HORIZONTAL);
             t.setPadding(0, Ui.dp(this, 10), 0, 0);
-            navIcons[i] = new Icon(this, ICONS[i], Ui.TEXT3);
+            navIcons[i] = new Icon(this, ICONS[i], Ui.TEXT2);
             t.addView(navIcons[i], new LinearLayout.LayoutParams(Ui.dp(this, 24), Ui.dp(this, 24)));
             // Full-width and centred (a single-line TextView left at its natural width drifted off centre)
-            navLabels[i] = Ui.medium(this, LABELS[i], 10.5f, Ui.TEXT3);
+            navLabels[i] = Ui.medium(this, LABELS[i], 10.5f, Ui.TEXT2);
             navLabels[i].setMaxLines(1);
             navLabels[i].setGravity(Gravity.CENTER_HORIZONTAL);
             navLabels[i].setPadding(0, Ui.dp(this, 7), 0, 0);
@@ -169,7 +169,7 @@ public class MainActivity extends Activity {
             page[from].view().setVisibility(View.GONE);
         }
         for (int i = 0; i < LABELS.length; i++) {
-            int col = i == idx ? Ui.TEXT : Ui.TEXT3;
+            int col = i == idx ? Ui.TEXT : Ui.TEXT2; // unselected: dimmer, but still crisp and readable
             navIcons[i].setColor(col);
             navLabels[i].setTextColor(col);
             navLabels[i].setTypeface(i == idx ? Ui.semibold() : Ui.medium());
