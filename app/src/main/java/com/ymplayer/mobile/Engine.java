@@ -60,5 +60,9 @@ public interface Engine {
     /** True if the stream has audio but none of it can be played by this engine (e.g. DTS on the Android player). */
     boolean audioUnsupported();
 
+    /** Picture shape: PIC_FIT (whole picture, bars), PIC_FILL (zoom to fill, edges cropped) or PIC_STRETCH. */
+    int PIC_FIT = 0, PIC_FILL = 1, PIC_STRETCH = 2;
+    void setPicture(int mode);
+
     void release();
 }

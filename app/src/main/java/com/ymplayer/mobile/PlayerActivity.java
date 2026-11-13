@@ -7,6 +7,7 @@ import android.os.Bundle;
 import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
@@ -148,11 +149,30 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         root.setBackgroundColor(Color.BLACK);
         videoHost = new FrameLayout(this);
         root.addView(videoHost, match());
+        videoHost.addOnLayoutChangeListener(new View.OnLayoutChangeListener() { // rotated / unfolded: keep a forced shape right
+            public void onLayoutChange(View v, int l, int t, int r, int b, int ol, int ot, int or, int ob) {
+                if (r - l != or - ol || b - t != ob - ot) Async.MAIN.post(new Runnable() { public void run() { applyPicture(); } });
+            }
+        });
 
         final GestureDetector gestures = new GestureDetector(this, new Gestures());
+        // Pinch out to fill the screen, pinch in to see the whole picture (like YouTube)
+        final ScaleGestureDetector pinch = new ScaleGestureDetector(this, new ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            float total = 1f;
+            @Override public boolean onScaleBegin(ScaleGestureDetector d) { total = 1f; return true; }
+            @Override public boolean onScale(ScaleGestureDetector d) { total *= d.getScaleFactor(); return true; }
+            @Override public void onScaleEnd(ScaleGestureDetector d) {
+                if (total > 1.15f && picture != 1) choosePicture(1);
+                else if (total < 0.87f && picture != 0) choosePicture(0);
+            }
+        });
         View touch = new View(this);
         View.OnTouchListener tl = new View.OnTouchListener() {
-            public boolean onTouch(View v, MotionEvent e) { return gestures.onTouchEvent(e) || true; }
+            public boolean onTouch(View v, MotionEvent e) {
+                pinch.onTouchEvent(e);
+                if (e.getPointerCount() > 1 || pinch.isInProgress()) return true; // two fingers: not a tap or a seek
+                return gestures.onTouchEvent(e) || true;
+            }
         };
         touch.setOnTouchListener(tl);
         root.addView(touch, match());
@@ -432,6 +452,9 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         }
         action(Icon.Kind.SUBS, isLive() ? "Audio & Subtitles" : "Subtitles & Audio", new View.OnClickListener() {
             public void onClick(View v) { openTracks(); }
+        });
+        action(Icon.Kind.FIT, "Picture", new View.OnClickListener() {
+            public void onClick(View v) { openPicture(); }
         });
         final Item fav = favTarget();
         if (fav != null) {
@@ -1263,6 +1286,53 @@ public class PlayerActivity extends Activity implements Engine.Listener {
             usingVlc = false;
         }
         videoHost.addView(engine.view(), 0, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER));
+        applyPicture();
+    }
+
+    // ------------------------------------------------------------ picture shape
+
+    static final String[] PICTURE = {"Fit", "Fill screen (zoom)", "Stretch", "16:9", "4:3"};
+    private static final String[] PICTURE_SHORT = {"Fit", "Fill", "Stretch", "16:9", "4:3"};
+    private int picture;
+
+    /** This channel / film / series' remembered shape, applied to whichever engine is playing. */
+    private void applyPicture() {
+        if (engine == null || queue == null) return;
+        picture = prefs.picture(current());
+        engine.setPicture(picture == 1 ? Engine.PIC_FILL : picture >= 2 ? Engine.PIC_STRETCH : Engine.PIC_FIT);
+        View v = engine.view();
+        if (!(v.getLayoutParams() instanceof FrameLayout.LayoutParams)) return;
+        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) v.getLayoutParams();
+        int w = ViewGroup.LayoutParams.MATCH_PARENT, h = ViewGroup.LayoutParams.MATCH_PARENT;
+        int W = videoHost.getWidth(), H = videoHost.getHeight();
+        if ((picture == 3 || picture == 4) && W > 0 && H > 0) { // 16:9 / 4:3: a box that shape, the picture stretched into it
+            float r = picture == 3 ? 16f / 9f : 4f / 3f;
+            if (W / (float) H > r) { h = H; w = Math.round(H * r); } else { w = W; h = Math.round(W / r); }
+        }
+        if (lp.width != w || lp.height != h) {
+            lp.width = w;
+            lp.height = h;
+            lp.gravity = Gravity.CENTER;
+            v.setLayoutParams(lp);
+        }
+    }
+
+    private void choosePicture(int mode) {
+        if (queue == null) return;
+        prefs.setPicture(current(), mode);
+        applyPicture();
+        status("Picture: " + PICTURE_SHORT[mode]);
+    }
+
+    private void openPicture() {
+        showControls(false);
+        List<Sheet.Option> o = new java.util.ArrayList<>();
+        for (int i = 0; i < PICTURE.length; i++) {
+            final int m = i;
+            o.add(new Sheet.Option(PICTURE[i], picture == i, new Runnable() { public void run() { choosePicture(m); } }));
+        }
+        String what = Item.EPISODE.equals(current().type) ? "this series" : isLive() ? "this channel" : "this film";
+        Sheet.show(this, "Picture", "Remembered for " + what + "  ·  pinch to fill or fit", o, picture);
     }
 
     private void releaseEngine() {
@@ -1383,6 +1453,7 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         hideNextCard();
         nextDismissed = false;
         showSkip(false);
+        applyPicture(); // each channel / film / series has its own
         Item it = current();
         long start = 0;
         long back = resumeMs;
@@ -1635,6 +1706,7 @@ public class PlayerActivity extends Activity implements Engine.Listener {
     @Override
     public void onBackPressed() {
         if (Coach.back(this)) return;
+        if (Sheet.dismiss(this)) return; // the Picture menu
         if (nextShown) { // Back on the card = watch the credits
             nextDismissed = true;
             hideNextCard();

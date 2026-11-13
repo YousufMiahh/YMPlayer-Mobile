@@ -229,7 +229,10 @@ final class FilterSettings {
         });
     }
 
-    static void askName(final Activity a, final Prefs prefs, final String type, final Item cat) {
+    static void askName(final Activity a, final Prefs prefs, final String type, final Item cat) { askName(a, prefs, type, cat, null); }
+
+    /** @param done run after Save or Original Name (to show the new name) */
+    static void askName(final Activity a, final Prefs prefs, final String type, final Item cat, final Runnable done) {
         final android.widget.EditText box = new android.widget.EditText(a);
         String mine = prefs.catName(type, cat.id);
         box.setText(mine == null ? cat.name : mine);
@@ -248,12 +251,14 @@ final class FilterSettings {
                         prefs.setCatName(type, cat.id, n.equals(cat.name) ? null : n);
                         Filters.changed();
                         Toast.makeText(a, n.isEmpty() || n.equals(cat.name) ? "Original name restored" : "Renamed to " + n, Toast.LENGTH_SHORT).show();
+                        if (done != null) done.run();
                     }
                 })
                 .setNeutralButton("Original Name", new android.content.DialogInterface.OnClickListener() {
                     public void onClick(android.content.DialogInterface d, int w) {
                         prefs.setCatName(type, cat.id, null);
                         Filters.changed();
+                        if (done != null) done.run();
                     }
                 })
                 .setNegativeButton("Cancel", null)

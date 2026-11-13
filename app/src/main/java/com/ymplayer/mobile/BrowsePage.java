@@ -277,19 +277,53 @@ class BrowsePage extends Page {
                 opt.heart(prefs.isFavCategory(type, c.id), new Runnable() {
                     public void run() { prefs.toggleFavCategory(type, c.id); }
                 });
-                opt.longPressRemoves(new Runnable() { // press and hold: hidden straight away
-                    public void run() {
-                        Filters.setCategoryHidden(prefs, type, c.id, true);
-                        if (prefs.isFavCategory(type, c.id)) prefs.toggleFavCategory(type, c.id);
-                        android.widget.Toast.makeText(a, "Hidden: " + c.name + "  (Settings → Hidden Categories to bring it back)",
-                                android.widget.Toast.LENGTH_SHORT).show();
-                        loadCategories();
-                    }
+                opt.longPress(new Runnable() { // press and hold: favourite, rename or hide
+                    public void run() { categoryMenu(c); }
                 });
             }
             o.add(opt);
         }
-        Sheet.show(a, title() + " categories", "Tap ♡ to favourite  ·  press and hold to hide", o, currentIndex, "Search categories");
+        Sheet.show(a, title() + " categories", "Tap ♡ to favourite  ·  press and hold for more", o, currentIndex, "Search categories");
+    }
+
+    /** Press and hold a category: favourite, rename or hide it. */
+    private void categoryMenu(final Item c) {
+        final boolean fav = prefs.isFavCategory(type, c.id);
+        List<Sheet.Option> o = new ArrayList<>();
+        o.add(new Sheet.Option(fav ? "♥  Remove from Favourites" : "♡  Add to Favourites", false, new Runnable() {
+            public void run() {
+                prefs.toggleFavCategory(type, c.id);
+                loadCategories();
+            }
+        }, fav));
+        o.add(new Sheet.Option("✎  Rename", false, new Runnable() {
+            public void run() {
+                // The provider's own name (the list may show your name for it)
+                Async.run(new Async.Work<Item>() {
+                    public Item run() throws Exception {
+                        for (Item r : Repo.categories(api, type)) if (r.id.equals(c.id)) return r;
+                        return c;
+                    }
+                }, new Async.Done<Item>() {
+                    public void done(Item raw, Exception e) {
+                        if (a.isFinishing()) return;
+                        FilterSettings.askName(a, prefs, type, raw != null ? raw : c, new Runnable() {
+                            public void run() { loadCategories(); }
+                        });
+                    }
+                });
+            }
+        }));
+        o.add(new Sheet.Option("Hide", false, new Runnable() {
+            public void run() {
+                Filters.setCategoryHidden(prefs, type, c.id, true);
+                if (prefs.isFavCategory(type, c.id)) prefs.toggleFavCategory(type, c.id);
+                android.widget.Toast.makeText(a, "Hidden: " + c.name + "  (Settings → Hidden Categories to bring it back)",
+                        android.widget.Toast.LENGTH_SHORT).show();
+                loadCategories();
+            }
+        }, true));
+        Sheet.show(a, c.name, null, o, 0);
     }
 
     /** Just the categories you've hearted. */
