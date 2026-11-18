@@ -290,6 +290,9 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         // Centre: back 5 s / play-pause / forward 10 s (channel down / up on Live TV)
         LinearLayout mid = new LinearLayout(this);
         mid.setGravity(Gravity.CENTER);
+        mid.setClipChildren(false); // the press highlight grows a little past the buttons: don't cut it off
+        mid.setClipToPadding(false);
+        controls.setClipChildren(false);
         leftBtn = icon(Icon.Kind.BACK10, 60, 12);
         playPause = icon(Icon.Kind.PAUSE, 72, 16);
         rightBtn = icon(Icon.Kind.FWD10, 60, 12);
