@@ -3,3 +3,7 @@
 - Picture: a new Picture button in the player lets you choose Fit, Fill screen, Stretch, 16:9 or 4:3. It's remembered for each channel, film and series.
 - Pinch to zoom: pinch out on the video to fill the screen, pinch in to see the whole picture.
 - "Because you watched" now only uses films and series you actually watched (finished, or at least 5 minutes in), not ones you only opened or started by accident.
+- Skip Recap: alongside Skip Intro, from TheIntroDB. The player's Audio & Subtitles menu shows what it found for each episode.
+- The player: Start Over, Episodes and Next Episode under the picture, and a settings button at the top.
+- Film and series pages, Netflix-style: Resume with its progress and Play From Beginning, or Play and Audio & Subtitles for something new. Something you're part way through plays in the picture at the top.
+- Because you watched: press and hold a card for "Don't recommend based on this".
