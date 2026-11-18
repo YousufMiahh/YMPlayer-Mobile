@@ -56,7 +56,8 @@ class DownloadButton extends LinearLayout {
         label = Ui.oneLine(Ui.medium(a, "Download", 11.5f, Ui.TEXT2));
         label.setPadding(0, Ui.dp(a, 6), 0, 0);
         label.setVisibility(withLabel ? VISIBLE : GONE);
-        addView(label);
+        label.setGravity(android.view.Gravity.CENTER_HORIZONTAL); // centred under the icon
+        addView(label, new LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
         int p = withLabel ? Ui.dp(a, 8) : Ui.dp(a, 10);
         setPadding(Ui.dp(a, 6), p, Ui.dp(a, 6), p);
         Ui.ripple(this, null, withLabel ? 12 : 22);

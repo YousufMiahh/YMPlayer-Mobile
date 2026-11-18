@@ -83,7 +83,8 @@ final class DetailUi {
         b.addView(i, new LinearLayout.LayoutParams(Ui.dp(a, 24), Ui.dp(a, 24)));
         TextView t = Ui.oneLine(Ui.medium(a, label, 11.5f, Ui.TEXT2));
         t.setPadding(0, Ui.dp(a, 6), 0, 0);
-        b.addView(t);
+        t.setGravity(Gravity.CENTER_HORIZONTAL); // the label sits centred under its icon
+        b.addView(t, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         b.setOnClickListener(l);
         Ui.pressable(b);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Ui.dp(a, 84), ViewGroup.LayoutParams.WRAP_CONTENT);
