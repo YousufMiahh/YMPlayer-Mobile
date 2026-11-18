@@ -855,7 +855,13 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         }, new Async.Done<Intros.Segments>() {
             public void done(Intros.Segments s, Exception e) {
                 // Still on this episode? (By what it is: the list around it may have been reloaded meanwhile)
-                if (!isFinishing() && queue != null && s != null && current().key().equals(ep.key())) segments = s;
+                if (!isFinishing() && queue != null && s != null && current().key().equals(ep.key())) {
+                    segments = s;
+                    // Say what the lookup found, so a missing Skip button is explained on the spot
+                    status("Skip Intro: " + (s.hasIntro() || s.hasRecap() ? "ready  ·  " : "") + s.status);
+                    Async.MAIN.removeCallbacks(hideStatus);
+                    Async.MAIN.postDelayed(hideStatus, 6000);
+                }
             }
         });
     }
