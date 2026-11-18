@@ -164,11 +164,11 @@ public final class Sheet {
             public View getView(int i, View v, ViewGroup parent) {
                 final Option o = visible.get(i);
                 final LinearLayout row = new LinearLayout(a);
-                row.setBackgroundColor(Ui.DARK ? 0xFF1C1C22 : 0xFFFFFFFF); // covers what's behind until it's swiped
                 row.setGravity(Gravity.CENTER_VERTICAL);
                 row.setPadding(Ui.dp(a, 20), 0, Ui.dp(a, o.hasHeart ? 6 : 20), 0);
                 row.setMinimumHeight(Ui.dp(a, 50));
-                Ui.ripple(row, null, 0);
+                // Solid (the sheet's colour), so whatever a swipe reveals stays hidden until then
+                Ui.ripple(row, o.swipe == null ? null : new android.graphics.drawable.ColorDrawable(Ui.DARK ? 0xFF1C1C22 : 0xFFFFFFFF), 0);
                 row.setClickable(false);
                 TextView l = Ui.oneLine(Ui.medium(a, o.label, 16, o.destructive ? Ui.RED : o.inert ? Ui.TEXT2 : Ui.TEXT));
                 if (o.checked) l.setTypeface(Ui.bold());
@@ -206,6 +206,7 @@ public final class Sheet {
                 under.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
                 under.setPadding(0, 0, Ui.dp(a, 22), 0);
                 under.setBackgroundColor(Ui.RED);
+                under.setVisibility(View.INVISIBLE); // only while it's being swiped
                 frame.addView(under, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
                 frame.addView(row, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
                 frame.setTag(row);
@@ -245,6 +246,7 @@ public final class Sheet {
                         if (!swiping) {
                             if (dx < -slop && Math.abs(dx) > Math.abs(dy) * 1.5f) {
                                 swiping = true;
+                                ((FrameLayout) cell).getChildAt(0).setVisibility(View.VISIBLE); // the red Hide underneath
                                 list.requestDisallowInterceptTouchEvent(true);
                                 MotionEvent cancel = MotionEvent.obtain(e); // no tap or press-and-hold now
                                 cancel.setAction(MotionEvent.ACTION_CANCEL);
@@ -283,7 +285,10 @@ public final class Sheet {
                                 }
                             }).start();
                         } else {
-                            row.animate().translationX(0).setDuration(220).setInterpolator(EASE).start();
+                            final View under = ((FrameLayout) cell).getChildAt(0);
+                            row.animate().translationX(0).setDuration(220).setInterpolator(EASE).withEndAction(new Runnable() {
+                                public void run() { under.setVisibility(View.INVISIBLE); }
+                            }).start();
                         }
                         cell = null;
                         return true;
