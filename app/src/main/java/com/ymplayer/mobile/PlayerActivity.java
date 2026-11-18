@@ -501,6 +501,9 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         o.add(new Sheet.Option("Picture", false, new Runnable() {
             public void run() { Async.MAIN.postDelayed(new Runnable() { public void run() { if (!isFinishing()) openPicture(); } }, 260); }
         }));
+        if (Item.EPISODE.equals(current().type)) { // what the skip-intro lookup found for this episode
+            o.add(new Sheet.Option("Skip Intro: " + (segments == null ? "looking up this episode…" : segments.status), false, null).inert());
+        }
         Sheet.show(this, "Settings", null, o, -1);
     }
 
@@ -862,13 +865,7 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         }, new Async.Done<Intros.Segments>() {
             public void done(Intros.Segments s, Exception e) {
                 // Still on this episode? (By what it is: the list around it may have been reloaded meanwhile)
-                if (!isFinishing() && queue != null && s != null && current().key().equals(ep.key())) {
-                    segments = s;
-                    // Say what the lookup found, so a missing Skip button is explained on the spot
-                    status("Skip Intro: " + (s.hasIntro() || s.hasRecap() ? "ready  ·  " : "") + s.status);
-                    Async.MAIN.removeCallbacks(hideStatus);
-                    Async.MAIN.postDelayed(hideStatus, 6000);
-                }
+                if (!isFinishing() && queue != null && s != null && current().key().equals(ep.key())) segments = s; // what it found is in the player's Subtitles & Audio menu
             }
         });
     }
