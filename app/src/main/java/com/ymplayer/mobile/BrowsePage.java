@@ -280,10 +280,13 @@ class BrowsePage extends Page {
                 opt.longPress(new Runnable() { // press and hold: favourite, rename or hide
                     public void run() { categoryMenu(c); }
                 });
+                opt.swipeLeft("Hide", new Runnable() { // swipe left: hidden (Settings → Hidden Categories brings it back)
+                    public void run() { hideCategory(c); }
+                });
             }
             o.add(opt);
         }
-        Sheet.show(a, title() + " categories", "Tap ♡ to favourite  ·  press and hold for more", o, currentIndex, "Search categories");
+        Sheet.show(a, title() + " categories", "Tap ♡ to favourite  ·  swipe left to hide  ·  hold for more", o, currentIndex, "Search categories");
     }
 
     /** Press and hold a category: favourite, rename or hide it. */
@@ -316,14 +319,18 @@ class BrowsePage extends Page {
         }));
         o.add(new Sheet.Option("Hide", false, new Runnable() {
             public void run() {
-                Filters.setCategoryHidden(prefs, type, c.id, true);
-                if (prefs.isFavCategory(type, c.id)) prefs.toggleFavCategory(type, c.id);
-                android.widget.Toast.makeText(a, "Hidden: " + c.name + "  (Settings → Hidden Categories to bring it back)",
-                        android.widget.Toast.LENGTH_SHORT).show();
-                loadCategories();
+                hideCategory(c);
             }
         }, true));
         Sheet.show(a, c.name, null, o, 0);
+    }
+
+    private void hideCategory(Item c) {
+        Filters.setCategoryHidden(prefs, type, c.id, true);
+        if (prefs.isFavCategory(type, c.id)) prefs.toggleFavCategory(type, c.id);
+        android.widget.Toast.makeText(a, "Hidden: " + c.name + "  (Settings → Hidden Categories to bring it back)",
+                android.widget.Toast.LENGTH_SHORT).show();
+        loadCategories();
     }
 
     /** Just the categories you've hearted. */

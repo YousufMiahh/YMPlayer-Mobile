@@ -48,6 +48,16 @@ public final class Sheet {
             return this;
         }
 
+        Runnable swipe;
+        String swipeLabel;
+
+        /** Swipe the row left to do this (e.g. hide a category): it slides away and leaves the sheet open. */
+        public Option swipeLeft(String label, Runnable r) {
+            swipeLabel = label;
+            swipe = r;
+            return this;
+        }
+
         /** A row that's just information (tapping it does nothing). */
         public Option inert() {
             inert = true;
@@ -153,7 +163,8 @@ public final class Sheet {
             public long getItemId(int i) { return i; }
             public View getView(int i, View v, ViewGroup parent) {
                 final Option o = visible.get(i);
-                LinearLayout row = new LinearLayout(a);
+                final LinearLayout row = new LinearLayout(a);
+                row.setBackgroundColor(Ui.DARK ? 0xFF1C1C22 : 0xFFFFFFFF); // covers what's behind until it's swiped
                 row.setGravity(Gravity.CENTER_VERTICAL);
                 row.setPadding(Ui.dp(a, 20), 0, Ui.dp(a, o.hasHeart ? 6 : 20), 0);
                 row.setMinimumHeight(Ui.dp(a, 50));
@@ -187,10 +198,101 @@ public final class Sheet {
                     });
                     row.addView(h, new LinearLayout.LayoutParams(Ui.dp(a, 46), Ui.dp(a, 46)));
                 }
-                return row;
+                if (o.swipe == null) return row;
+                // Behind the row: what a swipe to the left does, in red
+                FrameLayout frame = new FrameLayout(a);
+                TextView under = Ui.medium(a, o.swipeLabel, 15, 0xFFFFFFFF);
+                under.setTypeface(Ui.semibold());
+                under.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
+                under.setPadding(0, 0, Ui.dp(a, 22), 0);
+                under.setBackgroundColor(Ui.RED);
+                frame.addView(under, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+                frame.addView(row, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                frame.setTag(row);
+                return frame;
             }
         };
         list.setAdapter(adapter);
+        // Swipe a row left (where the option allows it): the row follows the finger, the red action
+        // shows underneath, and letting go far enough (or flicking) does it; otherwise it springs back
+        list.setOnTouchListener(new View.OnTouchListener() {
+            float x0, y0;
+            int pos = -1;
+            View cell;
+            boolean swiping;
+            android.view.VelocityTracker vt;
+            final int slop = android.view.ViewConfiguration.get(a).getScaledTouchSlop();
+
+            public boolean onTouch(View v, MotionEvent e) {
+                switch (e.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN: {
+                        x0 = e.getX();
+                        y0 = e.getY();
+                        swiping = false;
+                        pos = list.pointToPosition((int) x0, (int) y0);
+                        cell = pos < 0 ? null : list.getChildAt(pos - list.getFirstVisiblePosition());
+                        boolean can = cell != null && cell.getTag() instanceof View && pos < visible.size() && visible.get(pos).swipe != null;
+                        if (!can) cell = null;
+                        if (vt != null) vt.recycle();
+                        vt = android.view.VelocityTracker.obtain();
+                        vt.addMovement(e);
+                        return false;
+                    }
+                    case MotionEvent.ACTION_MOVE: {
+                        if (vt != null) vt.addMovement(e);
+                        if (cell == null) return false;
+                        float dx = e.getX() - x0, dy = e.getY() - y0;
+                        if (!swiping) {
+                            if (dx < -slop && Math.abs(dx) > Math.abs(dy) * 1.5f) {
+                                swiping = true;
+                                list.requestDisallowInterceptTouchEvent(true);
+                                MotionEvent cancel = MotionEvent.obtain(e); // no tap or press-and-hold now
+                                cancel.setAction(MotionEvent.ACTION_CANCEL);
+                                list.onTouchEvent(cancel);
+                                cancel.recycle();
+                            } else {
+                                return false;
+                            }
+                        }
+                        ((View) cell.getTag()).setTranslationX(Math.min(0, dx));
+                        return true;
+                    }
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL: {
+                        if (!swiping || cell == null) { swiping = false; return false; }
+                        swiping = false;
+                        final View row = (View) cell.getTag();
+                        float vx = 0;
+                        if (vt != null) {
+                            vt.addMovement(e);
+                            vt.computeCurrentVelocity(1000);
+                            vx = vt.getXVelocity();
+                        }
+                        float w = cell.getWidth(), at = row.getTranslationX();
+                        final int p = pos;
+                        if (at < -w * 0.4f || (vx < -1200 && at < -slop * 2)) {
+                            row.animate().translationX(-w).setDuration(160).withEndAction(new Runnable() {
+                                public void run() {
+                                    if (p >= visible.size()) return;
+                                    Option o = visible.get(p);
+                                    o.swipe.run();
+                                    visible.remove(o);
+                                    try { options.remove(o); } catch (UnsupportedOperationException ignored) { }
+                                    adapter.notifyDataSetChanged();
+                                    row.setTranslationX(0);
+                                }
+                            }).start();
+                        } else {
+                            row.animate().translationX(0).setDuration(220).setInterpolator(EASE).start();
+                        }
+                        cell = null;
+                        return true;
+                    }
+                    default:
+                        return false;
+                }
+            }
+        });
         list.setOnItemLongClickListener(new android.widget.AdapterView.OnItemLongClickListener() {
             public boolean onItemLongClick(android.widget.AdapterView<?> p, View v, int i, long id) {
                 final Option o = visible.get(i);
