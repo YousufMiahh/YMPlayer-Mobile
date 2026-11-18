@@ -96,6 +96,29 @@ public final class Ui {
     }
 
     /** Touch feedback: a soft ripple clipped to the view's rounded shape. */
+    /**
+     * Feedback the instant a finger lands (not when it lifts): the view gives a little, then
+     * springs back. Doesn't take the touch, so clicks and ripples carry on as normal.
+     */
+    public static void pressable(final View v) {
+        v.setOnTouchListener(new View.OnTouchListener() {
+            public boolean onTouch(View x, android.view.MotionEvent e) {
+                switch (e.getActionMasked()) {
+                    case android.view.MotionEvent.ACTION_DOWN:
+                        x.animate().scaleX(0.97f).scaleY(0.97f).setDuration(100).setInterpolator(EASE).start();
+                        break;
+                    case android.view.MotionEvent.ACTION_UP:
+                    case android.view.MotionEvent.ACTION_CANCEL:
+                        x.animate().scaleX(1f).scaleY(1f).setDuration(220).setInterpolator(EASE).start();
+                        break;
+                    default:
+                        break;
+                }
+                return false;
+            }
+        });
+    }
+
     public static void ripple(View v, Drawable content, float radiusDp) {
         GradientDrawable mask = rounded(v.getContext(), Color.WHITE, 0, radiusDp);
         int rc = DARK ? 0x33FFFFFF : 0x22000000;
@@ -243,6 +266,7 @@ public final class Ui {
         b.setMinimumHeight(dp(c, 46));
         b.setMinWidth(0);
         b.setMinimumWidth(0);
+        pressable(b);
         return b;
     }
 

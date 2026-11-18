@@ -85,6 +85,7 @@ final class DetailUi {
         t.setPadding(0, Ui.dp(a, 6), 0, 0);
         b.addView(t);
         b.setOnClickListener(l);
+        Ui.pressable(b);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Ui.dp(a, 84), ViewGroup.LayoutParams.WRAP_CONTENT);
         b.setLayoutParams(lp);
         return b;

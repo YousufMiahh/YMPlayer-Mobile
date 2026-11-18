@@ -123,6 +123,10 @@ public final class Cards {
         card.setOnTouchListener(new View.OnTouchListener() {
             public boolean onTouch(View v, android.view.MotionEvent e) {
                 View a = (View) v.getTag();
+                int m = e.getActionMasked(); // the card gives a little the moment it's touched
+                if (m == android.view.MotionEvent.ACTION_DOWN) v.animate().scaleX(0.97f).scaleY(0.97f).setDuration(100).start();
+                else if (m == android.view.MotionEvent.ACTION_UP || m == android.view.MotionEvent.ACTION_CANCEL)
+                    v.animate().scaleX(1f).scaleY(1f).setDuration(220).start();
                 if (a.getForeground() != null) {
                     a.getForeground().setHotspot(e.getX(), e.getY());
                     int act = e.getActionMasked();

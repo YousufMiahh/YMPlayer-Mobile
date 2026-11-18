@@ -281,20 +281,45 @@ public final class Sheet {
         panel.addView(list, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, h));
         if (scrollTo > 2) list.setSelection(scrollTo - 2);
 
-        // Swipe the sheet down to close it
+        // Drag the sheet: it follows your finger 1:1 (from where you took hold, even mid-animation),
+        // resists if you pull it up past the top, and the dimming follows it. Let go and it goes
+        // where your flick was heading, at your finger's speed: closed, or back up with a spring.
         panel.setOnTouchListener(new View.OnTouchListener() {
-            float startY;
+            float grab;
+            android.view.VelocityTracker vt;
             public boolean onTouch(View v, MotionEvent e) {
                 switch (e.getActionMasked()) {
-                    case MotionEvent.ACTION_DOWN: startY = e.getRawY(); return true;
-                    case MotionEvent.ACTION_MOVE:
-                        panel.setTranslationY(Math.max(0, e.getRawY() - startY));
+                    case MotionEvent.ACTION_DOWN:
+                        if (closing) return false;
+                        panel.animate().cancel();
+                        drag.stop();
+                        grab = e.getRawY() - panel.getTranslationY();
+                        vt = android.view.VelocityTracker.obtain();
+                        vt.addMovement(e);
                         return true;
+                    case MotionEvent.ACTION_MOVE: {
+                        if (vt != null) vt.addMovement(e);
+                        float y = e.getRawY() - grab;
+                        if (y < 0) y = -rubberBand(-y, panel.getHeight()); // soft edge, not a wall
+                        setDrag(y);
+                        return true;
+                    }
                     case MotionEvent.ACTION_UP:
-                    case MotionEvent.ACTION_CANCEL:
-                        if (panel.getTranslationY() > panel.getHeight() * 0.25f) close();
-                        else panel.animate().translationY(0).setDuration(180).start();
+                    case MotionEvent.ACTION_CANCEL: {
+                        float vel = 0;
+                        if (vt != null) {
+                            vt.addMovement(e);
+                            vt.computeCurrentVelocity(1000);
+                            vel = vt.getYVelocity();
+                            vt.recycle();
+                            vt = null;
+                        }
+                        float at = panel.getTranslationY();
+                        float projected = at + Spring.project(vel);
+                        if (projected > panel.getHeight() * 0.5f) dismiss(vel);
+                        else drag.to(0, vel, vel < -50 ? 0.8f : 1f, 0.3f, null); // back up (a touch of bounce if flicked)
                         return true;
+                    }
                 }
                 return false;
             }
@@ -321,6 +346,37 @@ public final class Sheet {
         });
     }
 
+    private final Spring drag = new Spring(new Spring.Value() {
+        public float get() { return panel.getTranslationY(); }
+        public void set(float v) { setDrag(v); }
+    });
+
+    /** The sheet at `y` below its open position, with the dimming fading as it goes. */
+    private void setDrag(float y) {
+        panel.setTranslationY(y);
+        float h = Math.max(1, panel.getHeight());
+        scrim.setAlpha(Math.max(0f, Math.min(1f, 1f - y / h)));
+    }
+
+    /** Past the edge it follows less and less: real things slow before they stop. */
+    private static float rubberBand(float over, float dim) {
+        float k = 0.55f;
+        return (over * dim * k) / (dim + k * Math.abs(over));
+    }
+
+    /** Thrown down: it carries on at the finger's speed until it's gone. */
+    private void dismiss(float velocity) {
+        if (closing) return;
+        closing = true;
+        if (OPEN.get(a) == this) OPEN.remove(a);
+        drag.to(panel.getHeight(), Math.max(velocity, 0), 1f, 0.3f, new Runnable() {
+            public void run() {
+                ViewGroup p = (ViewGroup) layer.getParent();
+                if (p != null) p.removeView(layer);
+            }
+        });
+    }
+
     /** Replace the rows while the sheet is open (e.g. Cast devices appearing). */
     public void setOptions(List<Option> options) {
         visible.clear();
@@ -338,6 +394,7 @@ public final class Sheet {
     public void close() {
         if (closing) return;
         closing = true;
+        drag.stop();
         if (OPEN.get(a) == this) OPEN.remove(a);
         scrim.animate().alpha(0f).setDuration(200).start();
         panel.animate().translationY(panel.getHeight()).setDuration(220).setInterpolator(EASE).withEndAction(new Runnable() {
