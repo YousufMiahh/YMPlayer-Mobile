@@ -280,9 +280,6 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         titles.addView(title);
         titles.addView(subtitle);
         top.addView(titles, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        Icon gear = icon(Icon.Kind.SETTINGS, 44, 11); // subtitles, audio and picture, like Netflix's cog
-        gear.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { openTracks(); } });
-        top.addView(gear);
         castBtn = icon(Icon.Kind.CAST, 44, 10);
         castBtn.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { Cast.pick(PlayerActivity.this); }
@@ -458,11 +455,9 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         if (isLive()) {
             action(Icon.Kind.LIST, "Channels", new View.OnClickListener() { public void onClick(View v) { openChannels(); } });
         }
-        action(Icon.Kind.SUBS, isLive() ? "Audio & Subtitles" : "Subtitles & Audio", new View.OnClickListener() {
-            public void onClick(View v) { openTracks(); }
-        });
-        action(Icon.Kind.FIT, "Picture", new View.OnClickListener() {
-            public void onClick(View v) { openPicture(); }
+        // Subtitles & Audio and Picture live under one Settings button, like Netflix's cog
+        action(Icon.Kind.SETTINGS, "Settings", new View.OnClickListener() {
+            public void onClick(View v) { openSettings(); }
         });
         final Item fav = favTarget();
         if (fav != null) {
@@ -495,6 +490,18 @@ public class PlayerActivity extends Activity implements Engine.Listener {
                 public void onClick(View v) { if (upNext() != null) playNext(); }
             });
         }
+    }
+
+    /** Settings: Subtitles & Audio, and the Picture shape. */
+    private void openSettings() {
+        List<Sheet.Option> o = new java.util.ArrayList<>();
+        o.add(new Sheet.Option(isLive() ? "Audio & Subtitles" : "Subtitles & Audio", false, new Runnable() {
+            public void run() { Async.MAIN.postDelayed(new Runnable() { public void run() { if (!isFinishing()) openTracks(); } }, 260); }
+        }));
+        o.add(new Sheet.Option("Picture", false, new Runnable() {
+            public void run() { Async.MAIN.postDelayed(new Runnable() { public void run() { if (!isFinishing()) openPicture(); } }, 260); }
+        }));
+        Sheet.show(this, "Settings", null, o, -1);
     }
 
     /** The series' episodes, every season, opened on the one playing; tap one to watch it. */
