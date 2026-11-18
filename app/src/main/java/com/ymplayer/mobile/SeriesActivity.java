@@ -31,6 +31,7 @@ public class SeriesActivity extends Activity {
     private TextView title, meta, plot, epLabel;
     private LinearLayout buttons, seasonRow, episodeRow;
     private Button playBtn;
+    private android.widget.ScrollView scroll;
     private String trailer;
     private final TreeMap<Integer, List<Item>> seasons = new TreeMap<>();
     private int activeSeason = Integer.MIN_VALUE;
@@ -51,7 +52,7 @@ public class SeriesActivity extends Activity {
         Ui.edgeToEdge(this);
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Ui.BG);
-        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        scroll = new android.widget.ScrollView(this);
         scroll.setVerticalScrollBarEnabled(false);
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
@@ -64,6 +65,10 @@ public class SeriesActivity extends Activity {
         backdrop.setScaleType(ImageView.ScaleType.CENTER_CROP);
         backdrop.setAlpha(0f);
         top.addView(backdrop, match());
+        FrameLayout previewHost = new FrameLayout(this); // the muted preview, under the artwork until it starts
+        top.addView(previewHost, 0, match());
+        preview = new Preview(this, prefs, api, previewHost, backdrop);
+        preview.setPicture(Engine.PIC_FILL);
         View fade = new View(this);
         fade.setBackground(Ui.pageScrimBottom());
         top.addView(fade, match());
@@ -135,25 +140,72 @@ public class SeriesActivity extends Activity {
         return null;
     }
 
+    private Item heroTarget;
+
+    private Item firstEpisode() {
+        for (Map.Entry<Integer, List<Item>> e : seasons.entrySet()) {
+            if (e.getKey() > 0 && !e.getValue().isEmpty()) return e.getValue().get(0);
+        }
+        return seasons.isEmpty() || seasons.firstEntry().getValue().isEmpty() ? null : seasons.firstEntry().getValue().get(0);
+    }
+
+    /** The episode after this one (into the next season), or null. */
+    private Item after(Item ep) {
+        boolean next = false;
+        for (Map.Entry<Integer, List<Item>> e : seasons.entrySet()) {
+            if (e.getKey() == 0) continue;
+            for (Item x : e.getValue()) {
+                if (next) return x;
+                if (x == ep) next = true;
+            }
+        }
+        return null;
+    }
+
     private void buildButtons() {
         buttons.removeAllViews();
         final Item last = lastWatched();
-        String label = "▶  Play";
-        if (last != null) {
-            Item match = find(last.id);
-            label = "▶  " + (prefs.position(last) > 0 ? "Resume " : "Play ") + (match != null ? shortName(match) : "");
+        Item match = last != null ? find(last.id) : null;
+        Item first = firstEpisode();
+        // Netflix: carry on with the one you were on (or the next one, once it's finished)
+        Item target = match != null ? match : first;
+        if (match != null && prefs.isWatched(match)) {
+            Item nx = after(match);
+            if (nx != null) target = nx;
         }
-        playBtn = Ui.primary(this, label.trim());
+        heroTarget = target;
+        long pos = target != null ? prefs.position(target) : 0, dur = target != null ? prefs.duration(target) : 0;
+        boolean resume = target != null && (pos > 0 || prefs.isUpNext(target) || (match != null && target != first));
+        String name = target == null ? "" : shortName(target).replace(" · E", resume ? ": Ep. " : ": E");
+        final Item go = target;
+        playBtn = Ui.primary(this, ((resume ? "▶  Resume " : "▶  Play ") + name).trim());
         playBtn.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                Item target = last != null ? find(last.id) : null;
-                if (target == null && !seasons.isEmpty()) target = seasons.firstEntry().getValue().get(0);
-                if (target != null) playEpisode(target);
-            }
+            public void onClick(View v) { if (go != null) { preview.stop(); playEpisode(go); } }
         });
         buttons.addView(playBtn, DetailUi.fullWidth(this, 0));
+        if (resume) DetailUi.progress(this, buttons, pos, dur);
+        buttons.addView(resume
+                ? DetailUi.secondary(this, "↻  Play From Beginning", new View.OnClickListener() {
+                    public void onClick(View v) {
+                        if (go == null) return;
+                        preview.stop();
+                        prefs.setPosition(go, 0);
+                        playEpisode(go);
+                    }
+                })
+                : DetailUi.secondary(this, "Audio & Subtitles", new View.OnClickListener() {
+                    public void onClick(View v) { DetailUi.audioSubtitles(SeriesActivity.this, prefs); }
+                }), DetailUi.fullWidth(this, 10));
+        if (target != null) {
+            epLabel.setText(name + "  ·  " + target.name);
+            epLabel.setVisibility(View.VISIBLE);
+            if (target.plot != null) plot.setText(target.plot);
+        }
         LinearLayout actions = new LinearLayout(this);
         actions.setPadding(0, Ui.dp(this, 14), 0, 0);
+        actions.addView(DetailUi.action(this, Icon.Kind.LIST, "Episodes", Ui.TEXT, new View.OnClickListener() {
+            public void onClick(View v) { showEpisodes(); }
+        }));
         final boolean fav = prefs.isFav(series);
         actions.addView(DetailUi.action(this, fav ? Icon.Kind.HEART_FILLED : Icon.Kind.HEART, "Favourite", fav ? Ui.RED : Ui.TEXT, new View.OnClickListener() {
             public void onClick(View v) {
@@ -163,10 +215,47 @@ public class SeriesActivity extends Activity {
         }));
         if (trailer != null) {
             actions.addView(DetailUi.action(this, Icon.Kind.TRAILER, "Trailer", Ui.TEXT, new View.OnClickListener() {
-                public void onClick(View v) { TrailerActivity.open(SeriesActivity.this, trailer); }
+                public void onClick(View v) { preview.stop(); TrailerActivity.open(SeriesActivity.this, trailer); }
             }));
         }
         buttons.addView(actions);
+        schedulePreview();
+    }
+
+    /** Episodes & More: down to the season, on the episode you'd play. */
+    private void showEpisodes() {
+        if (seasons.isEmpty()) return;
+        Integer want = null;
+        if (heroTarget != null) for (Map.Entry<Integer, List<Item>> e : seasons.entrySet()) if (e.getValue().contains(heroTarget)) want = e.getKey();
+        if (want != null && want != activeSeason) showSeason(want);
+        scroll.post(new Runnable() {
+            public void run() {
+                int y = seasonRow.getTop();
+                List<Item> l = seasons.get(activeSeason);
+                int at = l == null || heroTarget == null ? -1 : l.indexOf(heroTarget);
+                if (at > 0 && at < episodeRow.getChildCount()) y = episodeRow.getTop() + episodeRow.getChildAt(at).getTop() - Ui.dp(SeriesActivity.this, 60);
+                scroll.smoothScrollTo(0, Math.max(0, y));
+            }
+        });
+    }
+
+    // ------------------------------------------------------------ preview
+
+    private Preview preview;
+    private boolean resumedNow;
+
+    private final Runnable startPreview = new Runnable() {
+        public void run() {
+            long pos = heroTarget == null ? 0 : prefs.position(heroTarget);
+            if (!resumedNow || pos <= 0 || prefs.homePreviews() == 0) return;
+            preview.play(heroTarget, pos);
+        }
+    };
+
+    /** Something you were part way through plays (muted) in the picture at the top, from where you were. */
+    private void schedulePreview() {
+        Async.MAIN.removeCallbacks(startPreview);
+        if (heroTarget != null && prefs.position(heroTarget) > 0 && !preview.isPlaying(heroTarget)) Async.MAIN.postDelayed(startPreview, 2000);
     }
 
     private String shortName(Item ep) {
@@ -530,6 +619,7 @@ public class SeriesActivity extends Activity {
     protected void onResume() {
         super.onResume();
         paused = false;
+        resumedNow = true;
         if (!seasons.isEmpty()) {
             buildSeasonBar();
             buildEpisodes();
@@ -542,8 +632,18 @@ public class SeriesActivity extends Activity {
     @Override
     protected void onPause() {
         paused = true;
+        resumedNow = false;
+        Async.MAIN.removeCallbacks(startPreview);
+        if (preview != null) preview.stop();
         Async.MAIN.removeCallbacks(dlTick);
         super.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        Async.MAIN.removeCallbacks(startPreview);
+        if (preview != null) preview.release();
+        super.onDestroy();
     }
 
     @Override

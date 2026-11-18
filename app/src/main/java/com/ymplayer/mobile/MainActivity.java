@@ -155,8 +155,8 @@ public class MainActivity extends Activity {
             int dir = idx > from ? 1 : -1;
             in.setAlpha(0f);
             in.setTranslationX(dir * Ui.dp(this, 36));
-            in.animate().alpha(1f).translationX(0).setDuration(280).setInterpolator(EASE).start();
-            out.animate().alpha(0f).translationX(-dir * Ui.dp(this, 24)).setDuration(200).withEndAction(new Runnable() {
+            in.animate().alpha(1f).translationX(0).setDuration(350).setInterpolator(EASE).start();
+            out.animate().alpha(0f).translationX(-dir * Ui.dp(this, 24)).setDuration(250).withEndAction(new Runnable() {
                 public void run() {
                     if (current != from) {
                         out.setVisibility(View.GONE);
@@ -187,14 +187,14 @@ public class MainActivity extends Activity {
                 if (tab == null || tab.getWidth() == 0) return;
                 final float target = tab.getLeft() + (tab.getWidth() - navPill.getWidth()) / 2f;
                 if (pillAnim != null) pillAnim.cancel();
-                navPill.animate().alpha(1f).setDuration(150).start();
+                navPill.animate().alpha(1f).setDuration(190).start();
                 if (!animate || navPill.getAlpha() == 0f) {
                     navPill.setTranslationX(target);
                     return;
                 }
                 final float from = navPill.getTranslationX();
                 pillAnim = ValueAnimator.ofFloat(0f, 1f);
-                pillAnim.setDuration(300);
+                pillAnim.setDuration(380);
                 pillAnim.setInterpolator(EASE);
                 pillAnim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
                     public void onAnimationUpdate(ValueAnimator v) {

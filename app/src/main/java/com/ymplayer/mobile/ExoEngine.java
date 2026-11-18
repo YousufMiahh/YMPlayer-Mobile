@@ -89,6 +89,14 @@ public class ExoEngine implements Engine {
 
     public void play() { player.play(); }
     public void pause() { player.pause(); }
+
+    public void setVolume(float v) { if (player != null) player.setVolume(v); }
+
+    public void stopPlayback() {
+        if (player == null) return;
+        player.stop();
+        player.clearMediaItems();
+    }
     public boolean isPlaying() { return player.isPlaying(); }
     public boolean isReady() { return player.getPlaybackState() == Player.STATE_READY; }
 

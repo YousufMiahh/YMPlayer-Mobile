@@ -59,6 +59,10 @@ public class MovieActivity extends Activity {
         backdrop.setScaleType(ImageView.ScaleType.CENTER_CROP);
         backdrop.setAlpha(0f);
         top.addView(backdrop, match());
+        FrameLayout previewHost = new FrameLayout(this); // the muted preview, under the artwork until it starts
+        top.addView(previewHost, 0, match());
+        preview = new Preview(this, prefs, api, previewHost, backdrop);
+        preview.setPicture(Engine.PIC_FILL);
         View fade = new View(this);
         fade.setBackground(Ui.pageScrimBottom());
         FrameLayout.LayoutParams flp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
@@ -112,15 +116,13 @@ public class MovieActivity extends Activity {
             public void onClick(View v) { play(false); }
         });
         buttons.addView(playBtn, DetailUi.fullWidth(this, 0));
-        if (pos > 0 && dur > 0) {
-            View bar = Cards.progressBar(this, pos / (float) dur);
-            LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 3));
-            bl.topMargin = Ui.dp(this, 10);
-            buttons.addView(bar, bl);
-            TextView left = Ui.text(this, SeriesActivity.fmt(Math.max(0, dur - pos)) + " left", 12, Ui.TEXT2);
-            left.setPadding(0, Ui.dp(this, 6), 0, 0);
-            buttons.addView(left);
-        }
+        DetailUi.progress(this, buttons, pos, dur);
+        // Netflix: Play From Beginning under Resume; Audio & Subtitles for something new
+        buttons.addView(pos > 0
+                ? DetailUi.secondary(this, "↻  Play From Beginning", new View.OnClickListener() { public void onClick(View v) { play(true); } })
+                : DetailUi.secondary(this, "Audio & Subtitles", new View.OnClickListener() {
+                    public void onClick(View v) { DetailUi.audioSubtitles(MovieActivity.this, prefs); }
+                }), DetailUi.fullWidth(this, 10));
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
         actions.setPadding(0, Ui.dp(this, 14), 0, 0);
@@ -155,11 +157,6 @@ public class MovieActivity extends Activity {
                 buildButtons();
             }
         }));
-        if (pos > 0) {
-            actions.addView(DetailUi.action(this, Icon.Kind.RESTART, "Start Over", Ui.TEXT, new View.OnClickListener() {
-                public void onClick(View v) { play(true); }
-            }));
-        }
         // Share the width so every button fits, even with six of them on a narrow phone
         for (int i = 0; i < actions.getChildCount(); i++) {
             actions.getChildAt(i).setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
@@ -168,6 +165,7 @@ public class MovieActivity extends Activity {
     }
 
     private void play(boolean fromStart) {
+        preview.stop();
         if (fromStart) prefs.setPosition(movie, 0);
         List<Item> q = new ArrayList<>();
         q.add(movie);
@@ -240,8 +238,49 @@ public class MovieActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        resumedNow = true;
         if (buttons != null && buttons.getChildCount() > 0) buildButtons();
+        schedulePreview();
     }
+
+    @Override
+    protected void onPause() {
+        resumedNow = false;
+        Async.MAIN.removeCallbacks(startPreview);
+        if (preview != null) preview.stop();
+        super.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        Async.MAIN.removeCallbacks(startPreview);
+        if (preview != null) preview.release();
+        super.onDestroy();
+    }
+
+    private Item previewItem() { return movie; }
+
+    // ------------------------------------------------------------ preview
+
+    private Preview preview;
+    private boolean resumedNow;
+
+    private final Runnable startPreview = new Runnable() {
+        public void run() {
+            Item it = previewItem();
+            long pos = it == null ? 0 : prefs.position(it);
+            if (!resumedNow || it == null || pos <= 0 || prefs.homePreviews() == 0) return;
+            preview.play(it, pos);
+        }
+    };
+
+    /** Something you were part way through plays (muted) in the picture at the top, from where you were. */
+    private void schedulePreview() {
+        Async.MAIN.removeCallbacks(startPreview);
+        Item it = previewItem();
+        if (it != null && prefs.position(it) > 0) Async.MAIN.postDelayed(startPreview, 2000);
+    }
+
 
     @Override
     public void onBackPressed() {

@@ -65,4 +65,10 @@ public interface Engine {
     void setPicture(int mode);
 
     void release();
+
+    /** 0 (muted) to 1. */
+    void setVolume(float v);
+
+    /** Stop the current stream but keep the engine for the next one (the page previews). */
+    void stopPlayback();
 }

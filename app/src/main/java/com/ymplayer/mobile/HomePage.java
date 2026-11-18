@@ -198,10 +198,36 @@ class HomePage extends Page {
         remoteRows.removeAllViews();
         if (prefs.homeShows("top_movies")) add(remoteRows, "Top 10 Movies in the UK", topMovies, Cards.Shape.RANKED);
         if (prefs.homeShows("top_series")) add(remoteRows, "Top 10 Series in the UK", topSeries, Cards.Shape.RANKED);
-        if (recRows != null && prefs.homeShows("recommended")) for (Recs.Row r : recRows) add(remoteRows, r.title, r.items, Cards.Shape.POSTER);
+        if (recRows != null && prefs.homeShows("recommended")) for (final Recs.Row r : recRows) {
+            if (r.items == null || r.items.isEmpty()) continue;
+            if (r.sourceKey == null) { add(remoteRows, r.title, r.items, Cards.Shape.POSTER); continue; }
+            if (prefs.recBlocked(r.sourceKey)) continue;
+            remoteRows.addView(Cards.shelf(a, Cards.titleWithHint(r.title, "Hold for options"), r.items, Cards.Shape.POSTER, prefs, pick,
+                    new Cards.OnMenu() { public void menu(Item it, View card) { recMenu(r, it); } }));
+        }
         if (newMovies != null && prefs.homeShows("new_movies")) add(remoteRows, "Recently Added Movies", newMovies, Cards.Shape.POSTER);
         if (newSeries != null && prefs.homeShows("new_series")) add(remoteRows, "Recently Added Series", newSeries, Cards.Shape.POSTER);
         updateEmpty();
+    }
+
+    /** Hold a "Because you watched" card: its options, or stop basing rows on that title. */
+    private void recMenu(final Recs.Row r, final Item it) {
+        List<Sheet.Option> o = new ArrayList<>();
+        o.add(new Sheet.Option("Options for " + it.name + "…", false, new Runnable() {
+            public void run() {
+                Async.MAIN.post(new Runnable() { public void run() { toggleFavMenu(it); } });
+            }
+        }));
+        o.add(new Sheet.Option("Don't recommend based on " + r.sourceName, false, new Runnable() {
+            public void run() {
+                prefs.blockRec(r.sourceKey);
+                android.widget.Toast.makeText(a, "You won't see recommendations based on " + r.sourceName, android.widget.Toast.LENGTH_SHORT).show();
+                buildRemoteRows();
+                recSig = "";
+                loadRecs(); // the next thing you watched takes its place
+            }
+        }));
+        Sheet.show(a, r.title, null, o, -1);
     }
 
     private void add(LinearLayout parent, String title, List<Item> items, Cards.Shape shape) {

@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -36,6 +37,39 @@ final class DetailUi {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         lp.topMargin = Ui.dp(a, topMarginDp);
         return lp;
+    }
+
+    /** Netflix's grey full-width button under Play ("Play From Beginning", "Audio & Subtitles"). */
+    static Button secondary(Activity a, String label, View.OnClickListener l) {
+        Button b = Ui.button(a, label);
+        b.setOnClickListener(l);
+        return b;
+    }
+
+    /** Resume's progress: a thin bar and "38 min left". */
+    static void progress(Activity a, LinearLayout into, long pos, long dur) {
+        if (pos <= 0 || dur <= 0) return;
+        LinearLayout row = new LinearLayout(a);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, Ui.dp(a, 10), 0, 0);
+        View bar = Cards.progressBar(a, pos / (float) dur);
+        row.addView(bar, new LinearLayout.LayoutParams(0, Ui.dp(a, 3), 1f));
+        TextView left = Ui.text(a, SeriesActivity.fmt(Math.max(0, dur - pos)) + " left", 12, Ui.TEXT2);
+        left.setPadding(Ui.dp(a, 10), 0, 0, 0);
+        row.addView(left);
+        into.addView(row);
+    }
+
+    /** Audio & Subtitles before you start: the languages the player picks when it can. */
+    static void audioSubtitles(final Activity a, final Prefs prefs) {
+        String sl = prefs.subtitleLanguage(), al = prefs.audioLanguage();
+        java.util.List<Sheet.Option> o = new java.util.ArrayList<>();
+        o.add(new Sheet.Option("Subtitles: Off", "off".equals(sl), new Runnable() { public void run() { prefs.setSubtitleLanguage("off"); } }));
+        o.add(new Sheet.Option("Subtitles: English", "en".equals(sl), new Runnable() { public void run() { prefs.setSubtitleLanguage("en"); } }));
+        o.add(new Sheet.Option("Subtitles: as the stream sets them", "".equals(sl), new Runnable() { public void run() { prefs.setSubtitleLanguage(""); } }));
+        o.add(new Sheet.Option("Audio: English", "en".equals(al), new Runnable() { public void run() { prefs.setAudioLanguage("en"); } }));
+        o.add(new Sheet.Option("Audio: Original (as the stream sets it)", "".equals(al), new Runnable() { public void run() { prefs.setAudioLanguage(""); } }));
+        Sheet.show(a, "Audio & Subtitles", "Used from the next thing you play", o, 0);
     }
 
     /** Netflix-style icon-over-label action ("♡ Favourite", "Trailer"…). */

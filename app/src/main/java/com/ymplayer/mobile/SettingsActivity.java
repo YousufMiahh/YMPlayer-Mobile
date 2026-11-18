@@ -106,6 +106,12 @@ public class SettingsActivity extends Activity {
                 restartHome();
             }
         });
+        row("Film & Series Previews", prefs.homePreviews() == 1 ? "On" : "Off", new Action() {
+            public void run(TextView v) {
+                prefs.setHomePreviews(1 - prefs.homePreviews());
+                v.setText(prefs.homePreviews() == 1 ? "On" : "Off");
+            }
+        });
 
         section("Hide What You Don't Watch");
         row("Countries & Languages", FilterSettings.countriesLabel(prefs), new Action() {
@@ -125,6 +131,15 @@ public class SettingsActivity extends Activity {
                 public void run(TextView v) {
                     prefs.setHomeShows(key, !prefs.homeShows(key));
                     v.setText(prefs.homeShows(key) ? "On" : "Off");
+                }
+            });
+        }
+
+        if (prefs.recBlockedCount() > 0) {
+            row("Because You Watched", prefs.recBlockedCount() + " turned off  ·  Bring back", new Action() {
+                public void run(TextView v) {
+                    prefs.clearRecBlocks();
+                    v.setText("All back on");
                 }
             });
         }

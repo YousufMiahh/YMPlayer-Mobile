@@ -135,6 +135,15 @@ public class VlcEngine implements Engine {
 
     public void play() { mp.play(); }
     public void pause() { mp.pause(); }
+
+    public void setVolume(float v) { mp.setVolume(Math.round(Math.max(0f, Math.min(1f, v)) * 100)); }
+
+    public void stopPlayback() {
+        ready = false;
+        ops.execute(new Runnable() {
+            public void run() { if (!released) mp.stop(); }
+        });
+    }
     public boolean isPlaying() { return mp.isPlaying(); }
     public boolean isReady() { return ready; }
 

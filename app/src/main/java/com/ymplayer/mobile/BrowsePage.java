@@ -565,7 +565,7 @@ class BrowsePage extends Page {
         if (dir != 0) {
             content.setAlpha(0f);
             content.setTranslationX(dir * Ui.dp(a, 40));
-            content.animate().alpha(1f).translationX(0).setDuration(260).setInterpolator(EASE).start();
+            content.animate().alpha(1f).translationX(0).setDuration(330).setInterpolator(EASE).start();
         }
     }
 
@@ -584,7 +584,7 @@ class BrowsePage extends Page {
         if (animate) {
             in.setAlpha(0f);
             in.setTranslationY(Ui.dp(a, 24));
-            in.animate().alpha(1f).translationY(0).setDuration(260).setInterpolator(EASE).start();
+            in.animate().alpha(1f).translationY(0).setDuration(330).setInterpolator(EASE).start();
             out.animate().alpha(0f).setDuration(160).withEndAction(new Runnable() {
                 public void run() {
                     out.setVisibility(View.GONE);
