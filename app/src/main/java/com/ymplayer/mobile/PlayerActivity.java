@@ -280,6 +280,9 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         titles.addView(title);
         titles.addView(subtitle);
         top.addView(titles, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        Icon gear = icon(Icon.Kind.SETTINGS, 44, 11); // subtitles, audio and picture, like Netflix's cog
+        gear.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { openTracks(); } });
+        top.addView(gear);
         castBtn = icon(Icon.Kind.CAST, 44, 10);
         castBtn.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { Cast.pick(PlayerActivity.this); }
@@ -383,7 +386,12 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         actions = new LinearLayout(this);
         actions.setGravity(Gravity.CENTER);
         actions.setPadding(0, Ui.dp(this, 2), 0, 0);
-        bottom.addView(actions, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        // Scrolls sideways if they don't all fit (narrow screens, lots of buttons)
+        android.widget.HorizontalScrollView actionScroll = new android.widget.HorizontalScrollView(this);
+        actionScroll.setHorizontalScrollBarEnabled(false);
+        actionScroll.setFillViewport(true);
+        actionScroll.addView(actions, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        bottom.addView(actionScroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         controls.addView(bottom, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM));
         root.addView(controls, match());
 
@@ -467,16 +475,65 @@ public class PlayerActivity extends Activity implements Engine.Listener {
                 }
             });
         }
-        if (Item.EPISODE.equals(current().type) && index < queue.size() - 1) {
-            actNext = action(Icon.Kind.NEXT, "Next Episode", new View.OnClickListener() {
+        if (!isLive()) {
+            action(Icon.Kind.RESTART, "Start Over", new View.OnClickListener() {
                 public void onClick(View v) {
-                    savePosition();
-                    index++;
-                    retries = 0;
-                    play(true);
+                    curSeek(0);
+                    if (!curPlaying()) togglePause();
+                    status("Playing from the beginning");
+                    scheduleHide();
                 }
             });
         }
+        if (Item.EPISODE.equals(current().type)) {
+            action(Icon.Kind.LIST, "Episodes", new View.OnClickListener() { public void onClick(View v) { openEpisodes(); } });
+        }
+        final Item nx = isLive() ? null : upNext();
+        if (nx != null) {
+            boolean sameSeries = Item.EPISODE.equals(nx.type) && current().parentId != null && current().parentId.equals(nx.parentId);
+            actNext = action(Icon.Kind.NEXT, sameSeries ? "Next Episode" : "Next in Queue", new View.OnClickListener() {
+                public void onClick(View v) { if (upNext() != null) playNext(); }
+            });
+        }
+    }
+
+    /** The series' episodes, every season, opened on the one playing; tap one to watch it. */
+    private void openEpisodes() {
+        final Item cur = current();
+        if (!Item.EPISODE.equals(cur.type)) return;
+        showControls(false);
+        Async.run(new Async.Work<List<Item>>() {
+            public List<Item> run() throws Exception {
+                List<Item> all = Episodes.following(api, cur);
+                return all == null || all.isEmpty() ? new java.util.ArrayList<>(queue) : all;
+            }
+        }, new Async.Done<List<Item>>() {
+            public void done(List<Item> got, Exception e) {
+                if (isFinishing() || current() != cur) return;
+                final List<Item> all = got == null || got.isEmpty() ? new java.util.ArrayList<>(queue) : got;
+                List<Sheet.Option> o = new java.util.ArrayList<>();
+                int at = 0;
+                for (int i = 0; i < all.size(); i++) {
+                    final Item ep = all.get(i);
+                    final int idx = i;
+                    boolean playing = ep.key().equals(cur.key());
+                    if (playing) at = i;
+                    String label = (ep.season >= 0 ? "S" + ep.season + " " : "") + "E" + ep.num + "  ·  " + ep.name
+                            + (prefs.isWatched(ep) && !playing ? "   ✓" : "");
+                    o.add(new Sheet.Option(label, playing, new Runnable() {
+                        public void run() {
+                            if (idx < all.size() && all.get(idx).key().equals(current().key())) return;
+                            savePosition();
+                            queue = new java.util.ArrayList<>(all);
+                            index = idx;
+                            retries = 0;
+                            play(true); // carries on where you left that episode, like Netflix
+                        }
+                    }));
+                }
+                Sheet.show(PlayerActivity.this, cur.parentName == null ? "Episodes" : cur.parentName, null, o, at);
+            }
+        });
     }
 
     /** Episodes add their series to Favourites. */
@@ -702,6 +759,7 @@ public class PlayerActivity extends Activity implements Engine.Listener {
                 q.set(at, cur);
                 queue = q;
                 index = at;
+                buildActions(); // a Next Episode button now
             }
         });
     }
