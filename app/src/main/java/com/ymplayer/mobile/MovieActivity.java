@@ -97,7 +97,9 @@ public class MovieActivity extends Activity {
         col.addView(plot);
         col.addView(credits);
 
-        root.addView(DetailUi.backButton(this), DetailUi.backParams(this));
+        View back = DetailUi.backButton(this);
+        root.addView(back, DetailUi.backParams(this));
+        new LogoHeader(this, root, scroll, title, back, Tmdb.MOVIE, movie.name, movie.tmdb);
         setContentView(root);
         buildButtons();
         loadInfo();

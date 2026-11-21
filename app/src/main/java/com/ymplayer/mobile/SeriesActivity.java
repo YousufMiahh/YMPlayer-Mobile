@@ -114,7 +114,9 @@ public class SeriesActivity extends Activity {
         episodeRow.setOrientation(LinearLayout.VERTICAL);
         page.addView(episodeRow);
 
-        root.addView(DetailUi.backButton(this), DetailUi.backParams(this));
+        View back = DetailUi.backButton(this);
+        root.addView(back, DetailUi.backParams(this));
+        new LogoHeader(this, root, scroll, title, back, Tmdb.TV, series.name, series.tmdb);
         setContentView(root);
         loadBackdrop(series.icon);
         buildButtons();

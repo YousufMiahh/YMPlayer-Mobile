@@ -126,8 +126,14 @@ class HomePage extends Page {
         buildRemoteRows();
     }
 
+    /** Another device changed something (Continue Watching, favourites…): show it. */
+    private final Sync.Listener synced = new Sync.Listener() {
+        public void changed() { buildLocalRows(); }
+    };
+
     @Override
     void onStart() {
+        Sync.addListener(synced);
         Cast.listen(a, castChanges, true);
         paintCast();
         Async.MAIN.removeCallbacks(top10Tick);
@@ -137,6 +143,7 @@ class HomePage extends Page {
 
     @Override
     void onStop() {
+        Sync.removeListener(synced);
         Async.MAIN.removeCallbacks(top10Tick);
         Cast.listen(a, castChanges, false);
     }
