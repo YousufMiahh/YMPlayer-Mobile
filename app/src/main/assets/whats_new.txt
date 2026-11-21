@@ -1,8 +1,2 @@
-- A new launch animation: the Y and M fly in and lock together to make the logo.
-- Film and series pages, Netflix-style: Resume with its progress and Play From Beginning, or Play and Audio & Subtitles for something new. Something you're part way through plays in the picture at the top.
-- The player: one Settings button (Subtitles & Audio, Picture), plus Start Over, Episodes and Next Episode along the bottom.
-- Skip Intro and Skip Recap now also use SkipDB and IntroDB when TheIntroDB has nothing.
-- Categories: swipe a category left in the category list to hide it, or press and hold to favourite, rename or hide.
-- Because you watched: only titles you actually watched, and press and hold a card for "Don't recommend based on this".
-- Menus that slide up follow your finger and can be flicked away, and buttons respond the moment you touch them.
-- Sharper icons along the bottom, and labels centred under their icons.
+- Sync with your other devices: favourites, Continue Watching, watched, your queue and hidden or renamed categories now follow you between your phone, Fire TV, Mac and Samsung TV when they use the same login. It's encrypted on the phone, so the sync server can't see your login or what you watch. Settings → Sync to turn it off or sync now.
+- Film and series pages show the title's logo, like Netflix. Scroll down and it shrinks into a bar along the top that stays there.
