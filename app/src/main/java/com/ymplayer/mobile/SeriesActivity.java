@@ -185,7 +185,6 @@ public class SeriesActivity extends Activity {
             public void onClick(View v) { if (go != null) { preview.stop(); playEpisode(go); } }
         });
         buttons.addView(playBtn, DetailUi.fullWidth(this, 0));
-        if (resume) DetailUi.progress(this, buttons, pos, dur);
         buttons.addView(resume
                 ? DetailUi.secondary(this, "↻  Play From Beginning", new View.OnClickListener() {
                     public void onClick(View v) {

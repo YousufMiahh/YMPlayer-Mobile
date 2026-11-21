@@ -118,7 +118,6 @@ public class MovieActivity extends Activity {
             public void onClick(View v) { play(false); }
         });
         buttons.addView(playBtn, DetailUi.fullWidth(this, 0));
-        DetailUi.progress(this, buttons, pos, dur);
         // Netflix: Play From Beginning under Resume; Audio & Subtitles for something new
         buttons.addView(pos > 0
                 ? DetailUi.secondary(this, "↻  Play From Beginning", new View.OnClickListener() { public void onClick(View v) { play(true); } })
