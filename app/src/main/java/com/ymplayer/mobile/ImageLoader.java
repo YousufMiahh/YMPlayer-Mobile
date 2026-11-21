@@ -121,6 +121,23 @@ public final class ImageLoader {
         });
     }
 
+    private static final java.util.Map<String, Integer> TRIES = Collections.synchronizedMap(new java.util.HashMap<String, Integer>());
+
+    /**
+     * Still blank after both goes (the network wasn't up yet, or the image server is busy): try
+     * again a little later while the card is on screen, a few times, instead of staying empty.
+     */
+    private static void retryLater(final ImageView view, final String url, final int reqW, final int reqH, final android.view.View fallback) {
+        Integer n = TRIES.get(url);
+        if (n != null && n >= 4) return;
+        TRIES.put(url, n == null ? 1 : n + 1);
+        Async.MAIN.postDelayed(new Runnable() {
+            public void run() {
+                if (url.equals(view.getTag()) && view.isAttachedToWindow() && view.getDrawable() == null) load(view, url, reqW, reqH, fallback);
+            }
+        }, RETRY_MS + 1000);
+    }
+
     public static void load(final ImageView view, final String url, final int reqW, final int reqH) { load(view, url, reqW, reqH, null); }
 
     /**
@@ -153,6 +170,7 @@ public final class ImageLoader {
                 }
                 if (got == null) {
                     FAILED.put(url, System.currentTimeMillis());
+                    retryLater(view, url, reqW, reqH, fallback);
                     return;
                 }
                 final Bitmap bm = got;
