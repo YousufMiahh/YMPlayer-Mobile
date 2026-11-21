@@ -183,6 +183,7 @@ class HomePage extends Page {
     };
 
     private void buildLocalRows() {
+        if (localRows == null || remoteRows == null) return; // Home not built yet (you opened another tab first): it builds them itself
         localRows.removeAllViews();
         List<Item> cw = prefs.homeShows("continue") ? prefs.continueWatching() : new ArrayList<Item>();
         if (!cw.isEmpty()) {
@@ -202,6 +203,7 @@ class HomePage extends Page {
     }
 
     private void buildRemoteRows() {
+        if (localRows == null || remoteRows == null) return; // Home not built yet (you opened another tab first): it builds them itself
         remoteRows.removeAllViews();
         if (prefs.homeShows("top_movies")) add(remoteRows, "Top 10 Movies in the UK", topMovies, Cards.Shape.RANKED);
         if (prefs.homeShows("top_series")) add(remoteRows, "Top 10 Series in the UK", topSeries, Cards.Shape.RANKED);
