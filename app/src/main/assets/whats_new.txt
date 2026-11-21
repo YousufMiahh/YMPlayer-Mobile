@@ -1,3 +1,4 @@
 - Sync with your other devices: favourites, Continue Watching, watched, your queue, recently watched channels, favourite, hidden and renamed categories, picture shape, subtitle style and languages and your Home rows now follow you between your phone, Fire TV, Mac and Samsung TV when they use the same login, usually within seconds. It's encrypted on the phone, so the sync server can't see your login or what you watch. Settings → Sync to turn it off or sync now.
 - Film and series pages show the title's logo, like Netflix. Scroll down and it shrinks into a bar along the top that stays there.
 - Recent Channels: take a channel off the list one at a time (press and hold it, on Home or in Live TV → Recent Channels). It comes off your other devices too.
+- A new launch intro: "YOUSUF MIAH" folds away into its Y and M, which land in the logo.
