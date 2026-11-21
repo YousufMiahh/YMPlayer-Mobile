@@ -680,8 +680,8 @@ class BrowsePage extends Page {
         h.name.setText(it.name);
         h.sub.setText(it.num != null && !it.num.isEmpty() ? "Channel " + it.num : "");
         h.sub.setVisibility(h.sub.getText().length() == 0 ? View.GONE : View.VISIBLE);
-        h.initials.setText(Cards.initials(it.name)); // until the logo arrives, and kept if it can't be had
-        ImageLoader.load(h.logo, it.icon, 200, 120, h.initials);
+        h.initials.setText(it.icon == null || it.icon.isEmpty() ? Cards.initials(it.name) : "");
+        ImageLoader.load(h.logo, it.icon, 200, 120);
         paintHeart(h);
         return v;
     }
