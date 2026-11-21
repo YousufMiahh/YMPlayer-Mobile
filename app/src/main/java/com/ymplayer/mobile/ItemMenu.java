@@ -50,6 +50,11 @@ final class ItemMenu {
                 public void run() { prefs.setPosition(it, 0); }
             }, changed), true));
         }
+        if (live && prefs.inHistory(it)) {
+            o.add(new Sheet.Option("✕  Remove from Recent Channels", false, done(new Runnable() {
+                public void run() { prefs.removeHistory(it); }
+            }, changed), true));
+        }
         if (!episode) {
             o.add(new Sheet.Option(live ? "Play" : "More info", false, new Runnable() {
                 public void run() { Open.item(a, it, null); }
