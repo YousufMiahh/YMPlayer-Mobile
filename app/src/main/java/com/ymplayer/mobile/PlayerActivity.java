@@ -743,11 +743,36 @@ public class PlayerActivity extends Activity implements Engine.Listener {
      * This film / episode is done: marked watched, and the next episode (if there is one) goes
      * into Continue Watching, ready at the start, the way Netflix does it.
      */
+    /** Less than this left: the credits, so it counts as finished (and the next episode is up next). */
+    static final long CREDITS_MS = 3 * 60_000L;
+
     private void finishedCurrent() {
-        Item cur = current();
+        final Item cur = current();
         prefs.setWatched(cur, true);
-        if (!Item.EPISODE.equals(cur.type) || cur.parentId == null || index >= queue.size() - 1) return;
-        Item nx = queue.get(index + 1);
+        if (!Item.EPISODE.equals(cur.type) || cur.parentId == null) return;
+        if (index < queue.size() - 1) {
+            upNextAfter(cur, queue.get(index + 1));
+            return;
+        }
+        // Played on its own (from Continue Watching) or the last of a season: find what comes next
+        final Prefs p = prefs;
+        final XtreamApi a = api;
+        Async.run(new Async.Work<List<Item>>() {
+            public List<Item> run() throws Exception { return Episodes.following(a, cur); }
+        }, new Async.Done<List<Item>>() {
+            public void done(List<Item> all, Exception e) {
+                if (all == null) return;
+                for (int i = 0; i < all.size() - 1; i++) {
+                    if (all.get(i).id.equals(cur.id)) { upNextAfter(cur, all.get(i + 1), p); return; }
+                }
+            }
+        });
+    }
+
+    private void upNextAfter(Item cur, Item nx) { upNextAfter(cur, nx, prefs); }
+
+    /** The next episode goes into Continue Watching, ready at the start (unless already watched or started). */
+    private static void upNextAfter(Item cur, Item nx, Prefs prefs) {
         if (Item.EPISODE.equals(nx.type) && cur.parentId.equals(nx.parentId) && !prefs.isWatched(nx) && prefs.position(nx) == 0) {
             prefs.markUpNext(nx);
         }
@@ -834,7 +859,7 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         hideNextCard();
         if (nx == null) return;
         long d = curDur(), p = curPos();
-        if (d <= 0 || p >= d * 0.9 || p > d - 60_000 || p >= cardAt(d) - 2000) finishedCurrent(); // at the end
+        if (d <= 0 || p >= d * 0.9 || p > d - CREDITS_MS || p >= cardAt(d) - 2000) finishedCurrent(); // at the end
         else savePosition(); // skipped ahead early: not watched, keep your place
         if (Item.EPISODE.equals(current().type) && index < queue.size() - 1 && queue.get(index + 1) == nx) {
             index++;
@@ -1450,7 +1475,7 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         }
         // Ended well before the end: the connection dropped, it didn't finish. Pick up where it stopped.
         long d = curDur(), p = curPos();
-        if (d > 0 && p > 0 && p < d * 0.9 && p < d - 60_000) {
+        if (d > 0 && p > 0 && p < d * 0.9 && p < d - CREDITS_MS) {
             if (endRetries++ < 3) {
                 status("Reconnecting…");
                 load(p);
@@ -1616,7 +1641,7 @@ public class PlayerActivity extends Activity implements Engine.Listener {
         if (!hasPlayer() || queue == null || isLive()) return;
         long d = curDur(), p = curPos();
         if (d > 0) prefs.setDuration(current(), d);
-        if (d > 0 && (p > d - 60000 || p >= d * 0.9)) finishedCurrent(); // finished (or into the credits)
+        if (d > 0 && (p > d - CREDITS_MS || p >= d * 0.97)) finishedCurrent(); // finished: under 3 minutes left is the credits
         else if (p > 10000) prefs.setPosition(current(), p);
     }
 

@@ -2,3 +2,4 @@
 - Film and series pages show the title's logo, like Netflix. Scroll down and it shrinks into a bar along the top that stays there.
 - Recent Channels: take a channel off the list one at a time (press and hold it, on Home or in Live TV → Recent Channels). It comes off your other devices too.
 - A new launch intro: "YOUSUF MIAH" folds away into its Y and M, which land in the logo.
+- Continue Watching: stop an episode in its last 3 minutes (the credits) and it counts as watched, with the next episode waiting in Continue Watching, even across seasons.
